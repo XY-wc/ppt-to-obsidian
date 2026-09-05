@@ -1,0 +1,318 @@
+{
+  "id": "tcm",
+  "name": "中医学",
+  "desc": "中医学 专业知识框架",
+  "tags": [
+    "阴阳五行",
+    "辨证论治",
+    "方剂",
+    "针灸"
+  ],
+  "note_template": "病证名称-病因病机-辨证分型-治则治法-代表方剂-药物加减",
+  "core_concepts": [
+    {
+      "name": "阴阳",
+      "definition": "宇宙万物对立统一的基本规律"
+    },
+    {
+      "name": "五行",
+      "definition": "木火土金水五类事物属性及运动规律"
+    },
+    {
+      "name": "脏腑",
+      "definition": "五脏六腑和奇恒之府的总称"
+    },
+    {
+      "name": "气血",
+      "definition": "构成人体维持生命的基本物质"
+    },
+    {
+      "name": "津液",
+      "definition": "机体一切正常水液的总称"
+    },
+    {
+      "name": "经络",
+      "definition": "运行气血联络脏腑肢节的通路"
+    },
+    {
+      "name": "卫气营血",
+      "definition": "温病传变层次的四个阶段及物质"
+    },
+    {
+      "name": "六淫",
+      "definition": "风寒暑湿燥火六种外感病邪"
+    },
+    {
+      "name": "七情",
+      "definition": "喜怒忧思悲恐惊七种情志变化"
+    },
+    {
+      "name": "正气",
+      "definition": "人体正常功能活动及抗病能力"
+    },
+    {
+      "name": "邪气",
+      "definition": "各种致病因素的统称"
+    },
+    {
+      "name": "辨证论治",
+      "definition": "据四诊资料分析判断确定治则处方"
+    },
+    {
+      "name": "四诊",
+      "definition": "望闻问切四种诊察方法"
+    },
+    {
+      "name": "八纲辨证",
+      "definition": "阴阳表里寒热虚实八类基本证候"
+    },
+    {
+      "name": "脏腑辨证",
+      "definition": "以脏腑生理病理为基础的辨证方法"
+    },
+    {
+      "name": "六经辨证",
+      "definition": "伤寒病发展过程中的六类证候"
+    },
+    {
+      "name": "卫气营血辨证",
+      "definition": "温病发展传变四个阶段的辨证方法"
+    },
+    {
+      "name": "三焦辨证",
+      "definition": "温病以上中下三焦划分证候的方法"
+    },
+    {
+      "name": "理法方药",
+      "definition": "医理治则方剂药物的临床思路"
+    },
+    {
+      "name": "君臣佐使",
+      "definition": "方剂中药物配伍的主辅结构"
+    },
+    {
+      "name": "四气",
+      "definition": "药物寒热温凉四种药性"
+    },
+    {
+      "name": "五味",
+      "definition": "药物辛甘酸苦咸五种味道及功效"
+    },
+    {
+      "name": "归经",
+      "definition": "药物对特定脏腑经络的选择性作用"
+    },
+    {
+      "name": "升降浮沉",
+      "definition": "药物作用趋向的四种基本特性"
+    },
+    {
+      "name": "配伍",
+      "definition": "两种以上药物按一定原则组合使用"
+    },
+    {
+      "name": "十八反",
+      "definition": "三种药物配伍相反不可同用的禁忌"
+    },
+    {
+      "name": "十九畏",
+      "definition": "九组药物相畏不宜同用的禁忌"
+    },
+    {
+      "name": "痰饮",
+      "definition": "水液代谢失常停聚体内的病理产物"
+    },
+    {
+      "name": "瘀血",
+      "definition": "血液运行不畅停滞或离经之血未消"
+    },
+    {
+      "name": "表证",
+      "definition": "六淫邪气从皮毛口鼻侵入所致外感病初期"
+    },
+    {
+      "name": "里证",
+      "definition": "病位深在内脏腑气血的证候"
+    },
+    {
+      "name": "虚证",
+      "definition": "人体正气不足表现的证候"
+    },
+    {
+      "name": "实证",
+      "definition": "邪气盛实正气未衰表现的证候"
+    },
+    {
+      "name": "寒证",
+      "definition": "感受寒邪或阳虚阴盛所致的证候"
+    },
+    {
+      "name": "热证",
+      "definition": "感受热邪或阳盛阴虚所致的证候"
+    },
+    {
+      "name": "阴虚",
+      "definition": "体内阴液亏损虚热内生的病理变化"
+    },
+    {
+      "name": "阳虚",
+      "definition": "体内阳气虚衰虚寒内生病理变化"
+    },
+    {
+      "name": "气虚",
+      "definition": "元气不足脏腑功能衰退的病理变化"
+    },
+    {
+      "name": "血虚",
+      "definition": "血液不足脏腑组织失养的病理变化"
+    },
+    {
+      "name": "气滞",
+      "definition": "气机不畅流通受阻的病理变化"
+    },
+    {
+      "name": "湿热",
+      "definition": "湿邪热邪相合致病的病理因素"
+    },
+    {
+      "name": "风寒湿痹",
+      "definition": "风寒湿三气杂至合而为痹的病证"
+    },
+    {
+      "name": "肝郁气滞",
+      "definition": "肝失疏泄气机郁滞的常见证候"
+    },
+    {
+      "name": "脾胃虚弱",
+      "definition": "脾胃运化功能减退的虚损证候"
+    },
+    {
+      "name": "肾精不足",
+      "definition": "肾精亏虚生长发育生殖功能下降"
+    },
+    {
+      "name": "心肾不交",
+      "definition": "心肾水火不能既济协调的证候"
+    },
+    {
+      "name": "治未病",
+      "definition": "未病先防既病防变瘥后防复的防治思想"
+    },
+    {
+      "name": "同病异治",
+      "definition": "同一疾病因证不同而治法不同"
+    },
+    {
+      "name": "异病同治",
+      "definition": "不同疾病因证相同而治法相同"
+    },
+    {
+      "name": "整体观念",
+      "definition": "人体统一性及人与自然统一性认识"
+    }
+  ],
+  "symbol_mapping": [
+    {
+      "symbol": "↑",
+      "meaning": "脉象浮或药物升浮趋向"
+    },
+    {
+      "symbol": "↓",
+      "meaning": "脉象沉或药物沉降趋向"
+    },
+    {
+      "symbol": "←→",
+      "meaning": "表里传变或气机出入异常"
+    },
+    {
+      "symbol": "↑↓",
+      "meaning": "气机升降失调"
+    },
+    {
+      "symbol": " Tx",
+      "meaning": "治则/治法"
+    },
+    {
+      "symbol": "Sx",
+      "meaning": "症状"
+    },
+    {
+      "symbol": "Dx",
+      "meaning": "辨证诊断"
+    },
+    {
+      "symbol": "Rx",
+      "meaning": "处方/方剂"
+    },
+    {
+      "symbol": "Qi",
+      "meaning": "气"
+    },
+    {
+      "symbol": "Blood",
+      "meaning": "血"
+    },
+    {
+      "symbol": "Yin",
+      "meaning": "阴"
+    },
+    {
+      "symbol": "Yang",
+      "meaning": "阳"
+    },
+    {
+      "symbol": "WX",
+      "meaning": "五行"
+    },
+    {
+      "symbol": "ZB",
+      "meaning": "脏腑"
+    },
+    {
+      "symbol": "→",
+      "meaning": "传变方向或药物引经趋向"
+    },
+    {
+      "symbol": "M",
+      "meaning": "阴（用于简写阴阳对比时）"
+    },
+    {
+      "symbol": "Jue",
+      "meaning": "厥（厥证、厥阴）"
+    },
+    {
+      "symbol": "Bi",
+      "meaning": "痹（痹证）"
+    },
+    {
+      "symbol": "Tan",
+      "meaning": "痰"
+    },
+    {
+      "symbol": "Yu",
+      "meaning": "郁（郁证/肝郁）"
+    }
+  ],
+  "common_misconceptions": [
+    {
+      "misconception": "阴阳就是冷热",
+      "clarification": "阴阳是宇宙万物对立统一的基本规律，寒热仅是阴阳在具体事物上的一种表现，非其全部内涵"
+    },
+    {
+      "misconception": "五行就是五种物质元素",
+      "clarification": "五行是木火土金水五类事物属性及运动规律，是抽象的功能分类系统，非仅指具体物质"
+    },
+    {
+      "misconception": "气虚和阳虚是一回事",
+      "clarification": "气虚侧重功能减退，阳虚在气虚基础上伴有虚寒征象，程度和表现不同"
+    },
+    {
+      "misconception": "表证就是感冒",
+      "clarification": "表证是六淫外邪侵犯体表所致外感病初期阶段，感冒只是表证之一，表证范围更广"
+    },
+    {
+      "misconception": "中药没有副作用可以随意服用",
+      "clarification": "中药同样有偏性和毒性，用药需辨证论治，配伍有十八反十九畏等禁忌"
+    }
+  ]
+}

@@ -1,0 +1,318 @@
+{
+  "id": "pharmacy",
+  "name": "药学",
+  "desc": "药学 专业知识框架",
+  "tags": [
+    "药理",
+    "药代",
+    "药剂",
+    "临床药学"
+  ],
+  "note_template": "药物名称-作用机制-药代动力学特征-临床适应证-不良反应-禁忌证-用法用量",
+  "core_concepts": [
+    {
+      "name": "药效学",
+      "definition": "研究药物对机体作用及机制的科学"
+    },
+    {
+      "name": "药代动力学",
+      "definition": "研究药物在体内吸收分布代谢排泄过程"
+    },
+    {
+      "name": "生物利用度",
+      "definition": "药物被吸收进入血液循环的相对程度"
+    },
+    {
+      "name": "半衰期",
+      "definition": "血药浓度下降一半所需的时间"
+    },
+    {
+      "name": "表观分布容积",
+      "definition": "药物在体内达到某血药浓度的理论体积"
+    },
+    {
+      "name": "稳态血药浓度",
+      "definition": "恒速给药后药物摄入与消除达平衡的浓度"
+    },
+    {
+      "name": "首过效应",
+      "definition": "药物经肝脏代谢后进入体循环前被部分消除"
+    },
+    {
+      "name": "肝肠循环",
+      "definition": "药物经胆汁排入肠道后被重新吸收的过程"
+    },
+    {
+      "name": "受体",
+      "definition": "能识别并结合配体引发生物效应的蛋白"
+    },
+    {
+      "name": "激动剂",
+      "definition": "与受体结合并产生生物效应的配体"
+    },
+    {
+      "name": "拮抗剂",
+      "definition": "与受体结合但不产生效应，阻断激动剂"
+    },
+    {
+      "name": "部分激动剂",
+      "definition": "内在活性较弱，部分激活受体的配体"
+    },
+    {
+      "name": "效价强度",
+      "definition": "产生同等效应所需药物剂量的大小"
+    },
+    {
+      "name": "效能",
+      "definition": "药物能产生的最大效应"
+    },
+    {
+      "name": "治疗指数",
+      "definition": "半数致死量与半数有效量之比值"
+    },
+    {
+      "name": "副作用",
+      "definition": "治疗剂量下出现的与治疗目的无关的作用"
+    },
+    {
+      "name": "毒性反应",
+      "definition": "剂量过大或蓄积引起的机体损害"
+    },
+    {
+      "name": "变态反应",
+      "definition": "药物作为抗原引起的免疫异常反应"
+    },
+    {
+      "name": "后遗效应",
+      "definition": "停药后残存的血药浓度以下效应"
+    },
+    {
+      "name": "耐受性",
+      "definition": "连续用药后机体对药物反应降低"
+    },
+    {
+      "name": "耐药性",
+      "definition": "病原体对药物敏感性下降"
+    },
+    {
+      "name": "依赖性",
+      "definition": "反复用药致强迫性用药行为"
+    },
+    {
+      "name": "联合用药",
+      "definition": "两种或以上药物同时或先后使用"
+    },
+    {
+      "name": "协同作用",
+      "definition": "联合用药后效应大于各药单独之和"
+    },
+    {
+      "name": "拮抗作用",
+      "definition": "联合用药后效应低于各药单独之和"
+    },
+    {
+      "name": "药物剂型",
+      "definition": "药物经加工制成的适宜给药形式"
+    },
+    {
+      "name": "缓释制剂",
+      "definition": "用药后缓慢非恒速释放药物的制剂"
+    },
+    {
+      "name": "控释制剂",
+      "definition": "用药后恒速释放药物保持稳定血药浓度"
+    },
+    {
+      "name": "靶向制剂",
+      "definition": "药物选择性浓集于靶组织部位的制剂"
+    },
+    {
+      "name": "透皮给药系统",
+      "definition": "药物经皮肤吸收进入全身循环的制剂"
+    },
+    {
+      "name": "药典",
+      "definition": "国家记载药品规格标准的法定典籍"
+    },
+    {
+      "name": "药品不良反应",
+      "definition": "合格药品正常用法下出现的与用药目的无关反应"
+    },
+    {
+      "name": "药物相互作用",
+      "definition": "两种以上药物合用时产生的药效变化"
+    },
+    {
+      "name": "个体化给药",
+      "definition": "根据患者具体情况制定个性化用药方案"
+    },
+    {
+      "name": "治疗药物监测",
+      "definition": "测定血药浓度以指导临床个体化给药"
+    },
+    {
+      "name": "药物基因组学",
+      "definition": "研究基因变异对药物反应个体差异的影响"
+    },
+    {
+      "name": "构效关系",
+      "definition": "药物化学结构与其生物活性之间的关系"
+    },
+    {
+      "name": "定量构效关系",
+      "definition": "用数学模型描述药物结构与活性的关系"
+    },
+    {
+      "name": "前药",
+      "definition": "体外无活性体内代谢后产生活性的药物"
+    },
+    {
+      "name": "先导化合物",
+      "definition": "具有生物活性可优化的候选药物结构"
+    },
+    {
+      "name": "手性药物",
+      "definition": "含手性中心不同构型药效不同的药物"
+    },
+    {
+      "name": "药物代谢",
+      "definition": "药物在体内发生化学结构改变的过程"
+    },
+    {
+      "name": "细胞色素P450",
+      "definition": "肝微粒体中主要药物代谢酶系"
+    },
+    {
+      "name": "药源性疾病",
+      "definition": "药物作为致病因子引起的疾病"
+    },
+    {
+      "name": "时辰药理学",
+      "definition": "研究生物节律对药物作用影响的学科"
+    },
+    {
+      "name": "安慰剂",
+      "definition": "无药理活性外观同药物的对照制剂"
+    },
+    {
+      "name": "新药",
+      "definition": "未在中国境内上市销售的药品"
+    },
+    {
+      "name": "仿制药",
+      "definition": "与原研药剂量安全等效的仿制药品"
+    },
+    {
+      "name": "生物等效性",
+      "definition": "两制剂在相同条件下吸收程度速度等效"
+    },
+    {
+      "name": "药事管理学",
+      "definition": "研究药品研制生产经营使用管理的学科"
+    }
+  ],
+  "symbol_mapping": [
+    {
+      "symbol": "t1/2",
+      "meaning": "消除半衰期"
+    },
+    {
+      "symbol": "Cmax",
+      "meaning": "血药峰浓度"
+    },
+    {
+      "symbol": "Tmax",
+      "meaning": "达峰时间"
+    },
+    {
+      "symbol": "AUC",
+      "meaning": "药时曲线下面积"
+    },
+    {
+      "symbol": "Vd",
+      "meaning": "表观分布容积"
+    },
+    {
+      "symbol": "CL",
+      "meaning": "清除率"
+    },
+    {
+      "symbol": "F",
+      "meaning": "生物利用度"
+    },
+    {
+      "symbol": "Ke",
+      "meaning": "消除速率常数"
+    },
+    {
+      "symbol": "Ka",
+      "meaning": "吸收速率常数"
+    },
+    {
+      "symbol": "LD50",
+      "meaning": "半数致死量"
+    },
+    {
+      "symbol": "ED50",
+      "meaning": "半数有效量"
+    },
+    {
+      "symbol": "TI",
+      "meaning": "治疗指数"
+    },
+    {
+      "symbol": "Css",
+      "meaning": "稳态血药浓度"
+    },
+    {
+      "symbol": "Dm",
+      "meaning": "维持剂量"
+    },
+    {
+      "symbol": "Dl",
+      "meaning": "负荷剂量"
+    },
+    {
+      "symbol": "i.v.",
+      "meaning": "静脉注射"
+    },
+    {
+      "symbol": "i.m.",
+      "meaning": "肌内注射"
+    },
+    {
+      "symbol": "p.o.",
+      "meaning": "口服给药"
+    },
+    {
+      "symbol": "s.c.",
+      "meaning": "皮下注射"
+    },
+    {
+      "symbol": "CYP",
+      "meaning": "细胞色素P450酶系"
+    }
+  ],
+  "common_misconceptions": [
+    {
+      "misconception": "半衰期越长药物越安全",
+      "clarification": "半衰期仅反映消除速度，安全性取决于治疗指数和毒副作用谱"
+    },
+    {
+      "misconception": "副作用就是毒性反应",
+      "clarification": "副作用是治疗剂量下与治疗目的无关的反应，毒性反应是过量或蓄积造成的损害"
+    },
+    {
+      "misconception": "缓释片和控释片是一回事",
+      "clarification": "缓释是非恒速缓慢释放，控释是恒速释放维持稳定血药浓度"
+    },
+    {
+      "misconception": "生物利用度高等于药效一定强",
+      "clarification": "生物利用度反映吸收程度，药效强弱取决于血药浓度与效应关系"
+    },
+    {
+      "misconception": "联合用药越多效果越好",
+      "clarification": "联合用药需考虑药物相互作用，不当联用可增加不良反应或降低疗效"
+    }
+  ]
+}

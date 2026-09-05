@@ -1,0 +1,318 @@
+{
+  "id": "ai",
+  "name": "人工智能",
+  "desc": "人工智能 专业知识框架",
+  "tags": [
+    "机器学习",
+    "深度学习",
+    "NLP",
+    "CV"
+  ],
+  "note_template": "问题定义-模型原理-数学推导-算法流程-实验评估-优缺点分析",
+  "core_concepts": [
+    {
+      "name": "机器学习",
+      "definition": "通过数据让算法自动改进性能的方法"
+    },
+    {
+      "name": "深度学习",
+      "definition": "基于多层神经网络的学习方法"
+    },
+    {
+      "name": "监督学习",
+      "definition": "从有标签数据中学习输入到输出的映射"
+    },
+    {
+      "name": "无监督学习",
+      "definition": "从无标签数据中发现潜在结构和模式"
+    },
+    {
+      "name": "半监督学习",
+      "definition": "利用少量有标签和大量无标签数据学习"
+    },
+    {
+      "name": "强化学习",
+      "definition": "通过与环境交互获得奖励学习最优策略"
+    },
+    {
+      "name": "迁移学习",
+      "definition": "将已学知识迁移到新任务领域的方法"
+    },
+    {
+      "name": "神经网络",
+      "definition": "模拟生物神经元的分层计算模型"
+    },
+    {
+      "name": "卷积神经网络",
+      "definition": "利用卷积运算提取空间特征的神经网络"
+    },
+    {
+      "name": "循环神经网络",
+      "definition": "处理序列数据具有记忆能力的神经网络"
+    },
+    {
+      "name": "Transformer",
+      "definition": "基于自注意力机制的序列处理架构"
+    },
+    {
+      "name": "注意力机制",
+      "definition": "动态聚焦输入中重要部分的计算机制"
+    },
+    {
+      "name": "生成对抗网络",
+      "definition": "生成器与判别器对抗训练的生成模型"
+    },
+    {
+      "name": "自编码器",
+      "definition": "编码解码重建输入的无监督模型"
+    },
+    {
+      "name": "梯度下降",
+      "definition": "沿损失函数负梯度方向更新参数的优化方法"
+    },
+    {
+      "name": "反向传播",
+      "definition": "通过链式法则计算梯度的算法"
+    },
+    {
+      "name": "损失函数",
+      "definition": "衡量预测值与真实值差异的函数"
+    },
+    {
+      "name": "激活函数",
+      "definition": "引入非线性变换的神经元函数"
+    },
+    {
+      "name": "过拟合",
+      "definition": "模型在训练集表现好但泛化能力差"
+    },
+    {
+      "name": "欠拟合",
+      "definition": "模型过于简单无法捕捉数据规律"
+    },
+    {
+      "name": "正则化",
+      "definition": "约束模型复杂度防止过拟合的技术"
+    },
+    {
+      "name": "批归一化",
+      "definition": "对每层输入做标准化加速训练稳定"
+    },
+    {
+      "name": "Dropout",
+      "definition": "训练时随机丢弃神经元防止过拟合"
+    },
+    {
+      "name": "学习率",
+      "definition": "每次参数更新的步长大小"
+    },
+    {
+      "name": "批大小",
+      "definition": "每次迭代使用样本的数量"
+    },
+    {
+      "name": "交叉验证",
+      "definition": "将数据分折交替验证评估模型"
+    },
+    {
+      "name": "特征工程",
+      "definition": "从原始数据构造有效特征的过程"
+    },
+    {
+      "name": "降维",
+      "definition": "减少特征维度保留关键信息的方法"
+    },
+    {
+      "name": "主成分分析",
+      "definition": "线性降维保留最大方差方向的方法"
+    },
+    {
+      "name": "聚类",
+      "definition": "将样本按相似性分组的无监督方法"
+    },
+    {
+      "name": "分类",
+      "definition": "预测样本离散类别标签的监督任务"
+    },
+    {
+      "name": "回归",
+      "definition": "预测样本连续数值输出的监督任务"
+    },
+    {
+      "name": "决策树",
+      "definition": "基于特征判断构建树形决策的模型"
+    },
+    {
+      "name": "随机森林",
+      "definition": "多棵决策树集成投票的模型"
+    },
+    {
+      "name": "支持向量机",
+      "definition": "寻找最优分类超平面的分类方法"
+    },
+    {
+      "name": "K近邻",
+      "definition": "基于最近邻投票的分类回归方法"
+    },
+    {
+      "name": "朴素贝叶斯",
+      "definition": "基于贝叶斯定理假设特征独立的分类器"
+    },
+    {
+      "name": "梯度提升树",
+      "definition": "逐步拟合残差集成弱树的提升方法"
+    },
+    {
+      "name": "自然语言处理",
+      "definition": "让计算机理解和生成人类语言的技术"
+    },
+    {
+      "name": "计算机视觉",
+      "definition": "让计算机理解和处理图像信息的技术"
+    },
+    {
+      "name": "词向量",
+      "definition": "将词语映射到连续向量空间表示"
+    },
+    {
+      "name": "预训练模型",
+      "definition": "在大规模数据上预训练后微调的模型"
+    },
+    {
+      "name": "微调",
+      "definition": "在预训练模型上用领域数据继续训练"
+    },
+    {
+      "name": "大语言模型",
+      "definition": "基于大规模文本训练的巨大参数语言模型"
+    },
+    {
+      "name": "Prompt工程",
+      "definition": "设计有效提示词引导模型输出的技术"
+    },
+    {
+      "name": "检索增强生成",
+      "definition": "结合外部检索增强生成质量的方法"
+    },
+    {
+      "name": "多模态学习",
+      "definition": "融合处理多种模态数据的AI方法"
+    },
+    {
+      "name": "联邦学习",
+      "definition": "多方协作训练共享模型不泄露数据"
+    },
+    {
+      "name": "模型蒸馏",
+      "definition": "用大模型指导训练小模型的压缩技术"
+    },
+    {
+      "name": "可解释AI",
+      "definition": "使AI决策过程可理解可解释的技术"
+    }
+  ],
+  "symbol_mapping": [
+    {
+      "symbol": "X",
+      "meaning": "输入特征矩阵或向量"
+    },
+    {
+      "symbol": "y",
+      "meaning": "标签或输出向量"
+    },
+    {
+      "symbol": "ŷ",
+      "meaning": "模型预测值"
+    },
+    {
+      "symbol": "θ",
+      "meaning": "模型参数向量"
+    },
+    {
+      "symbol": "W",
+      "meaning": "权重矩阵"
+    },
+    {
+      "symbol": "b",
+      "meaning": "偏置项"
+    },
+    {
+      "symbol": "L(·)",
+      "meaning": "损失函数"
+    },
+    {
+      "symbol": "∇",
+      "meaning": "梯度运算符"
+    },
+    {
+      "symbol": "η / α",
+      "meaning": "学习率"
+    },
+    {
+      "symbol": "σ(·)",
+      "meaning": "激活函数（如sigmoid）"
+    },
+    {
+      "symbol": "ReLU",
+      "meaning": "线性整流激活函数"
+    },
+    {
+      "symbol": "P(·)",
+      "meaning": "概率分布"
+    },
+    {
+      "symbol": "E[·]",
+      "meaning": "期望值"
+    },
+    {
+      "symbol": "argmax",
+      "meaning": "取使函数值最大的参数"
+    },
+    {
+      "symbol": "argmin",
+      "meaning": "取使函数值最小的参数"
+    },
+    {
+      "symbol": "⊕",
+      "meaning": "逐元素相加（广播加法）"
+    },
+    {
+      "symbol": "⊙",
+      "meaning": "逐元素相乘（Hadamard积）"
+    },
+    {
+      "symbol": "T",
+      "meaning": "矩阵转置"
+    },
+    {
+      "symbol": "||·||",
+      "meaning": "向量或矩阵的范数"
+    },
+    {
+      "symbol": "softmax",
+      "meaning": "将向量归一化为概率分布的函数"
+    }
+  ],
+  "common_misconceptions": [
+    {
+      "misconception": "神经网络层数越深效果越好",
+      "clarification": "层数过深可能导致梯度消失/爆炸、过拟合及训练困难，需结合数据规模和任务合理设计"
+    },
+    {
+      "misconception": "过拟合只能靠减少参数解决",
+      "clarification": "过拟合可通过正则化、Dropout、数据增强、提前停止等多种方式缓解，不仅是减参数"
+    },
+    {
+      "misconception": "准确率高就是好模型",
+      "clarification": "在不均衡数据集中准确率具有误导性，需结合精确率、召回率、F1值等多指标综合评估"
+    },
+    {
+      "misconception": "学习率越大训练越快",
+      "clarification": "学习率过大会导致损失振荡或发散，需选择合适学习率或使用自适应优化器"
+    },
+    {
+      "misconception": "大模型一定比小模型好",
+      "clarification": "大模型需更多数据和算力且可能过拟合，小模型在资源受限或简单任务场景下可能更优"
+    }
+  ]
+}
