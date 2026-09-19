@@ -33,6 +33,12 @@ outputs/*.ppt
 docs/*.png
 docs/*.jpg
 docs/使用说明*.txt
+# 本地界面预览截图(开发自测用)
+_ui_*.png
+
+# 打包临时目录
+_dist_tmp/
+_build_tmp/
 
 # 桌面快捷方式/临时
 *.lnk

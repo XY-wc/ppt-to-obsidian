@@ -35,64 +35,191 @@ from pipeline import run_conversion
 from obsidian import refine as refine_mod
 from obsidian.kb_calibration import CalibrationStore
 
-# ---------- 配色 ----------
-BG = "#eef1f6"
-SURFACE = "#ffffff"
-SURFACE_2 = "#f8fafc"
-PRIMARY = "#2563eb"
-PRIMARY_HOVER = "#1d4ed8"
-PRIMARY_LIGHT = "#dbeafe"
-TEXT = "#0f172a"
-TEXT_MED = "#475569"
-TEXT_LIGHT = "#94a3b8"
-BORDER = "#e2e8f0"
-SUCCESS = "#059669"
-SUCCESS_BG = "#d1fae5"
-DANGER = "#dc2626"
+# ---------- 配色(现代靛蓝体系) ----------
+BG = "#f3f4f9"            # 窗口底: 淡紫灰
+SURFACE = "#ffffff"       # 卡片
+SURFACE_2 = "#f8f9fd"     # 次级面
+PRIMARY = "#4f46e5"       # 主色: 靛蓝
+PRIMARY_HOVER = "#4338ca"
+PRIMARY_LIGHT = "#e0e7ff"
+PRIMARY_SOFT = "#eef0ff"  # 芯片/浅底
+ACCENT = "#7c3aed"        # 渐变尾色(紫)
+TEXT = "#1a1d2e"
+TEXT_MED = "#5b6178"
+TEXT_LIGHT = "#9aa1b5"
+BORDER = "#e6e8f0"
+SUCCESS = "#10b981"
+SUCCESS_HOVER = "#0da271"
+SUCCESS_BG = "#d9f7ec"
+DANGER = "#ef4444"
 DANGER_BG = "#fee2e2"
+SHADOW = "#e2e5f1"        # 卡片投影
 
 FONT = ("Microsoft YaHei UI", 10)
 FONT_S = ("Microsoft YaHei UI", 9)
 FONT_XS = ("Microsoft YaHei UI", 8)
-FONT_TITLE = ("Microsoft YaHei UI", 20, "bold")
-FONT_H1 = ("Microsoft YaHei UI", 14, "bold")
+FONT_TITLE = ("Microsoft YaHei UI", 22, "bold")
+FONT_H1 = ("Microsoft YaHei UI", 15, "bold")
 FONT_H2 = ("Microsoft YaHei UI", 12, "bold")
 FONT_B = ("Microsoft YaHei UI", 11, "bold")
 
+# 按钮种类 -> (默认底, hover底, 前景)
+BTN_KINDS = {
+    "primary": (PRIMARY, PRIMARY_HOVER, "white"),
+    "success": (SUCCESS, SUCCESS_HOVER, "white"),
+    "danger": ("#fef2f2", "#fee2e2", DANGER),
+    "ghost": ("#eef0f7", "#e2e6f0", TEXT_MED),
+}
+
+
+def mkbtn(parent, text, cmd, kind="ghost", font=FONT_S, padx=12, pady=5, width=None):
+    """统一的扁平按钮: 圆角感靠配色, hover 变色, 手型光标。"""
+    bg, hov, fg = BTN_KINDS[kind]
+    b = tk.Button(parent, text=text, command=cmd, bg=bg, fg=fg,
+                  activebackground=hov, activeforeground=fg,
+                  relief="flat", bd=0, cursor="hand2", font=font,
+                  padx=padx, pady=pady, width=width)
+    b.bind("<Enter>", lambda e: b.config(bg=hov) if str(b["state"]) != "disabled" else None)
+    b.bind("<Leave>", lambda e: b.config(bg=bg))
+    b._home_bg = bg
+    return b
+
 
 class RoundedFrame(tk.Canvas):
-    def __init__(self, parent, radius=12, bg=SURFACE, border=BORDER, border_w=1, **kw):
+    """圆角卡片: 柔和投影 + 1px 细边。内容放在 .inner() 里, 高度随内容自适应。"""
+
+    def __init__(self, parent, radius=14, bg=SURFACE, border=BORDER, border_w=1,
+                 shadow=True, **kw):
         self._r = radius
         self._bg = bg
         self._border = border
         self._border_w = border_w
+        self._shadow = shadow
+        self._fit = kw.pop("fit_height", True)
         super().__init__(parent, bg=parent.cget("bg"), highlightthickness=0, **kw)
         self._children = tk.Frame(self, bg=bg)
         self._children.bind("<Configure>", lambda e: self._draw())
         self.bind("<Configure>", lambda e: self._draw())
         self._draw()
 
+    @staticmethod
+    def _rpts(w, h, r, dx=0, dy=0):
+        return [r + dx, dy, w - r + dx, dy, w + dx, dy, w + dx, r + dy,
+                w + dx, h - r + dy, w + dx, h + dy, w - r + dx, h + dy,
+                r + dx, h + dy, dx, h + dy, dx, h - r + dy, dx, r + dy, dx, dy, r + dx, dy]
+
     def _draw(self):
         self.delete("all")
         w = self.winfo_width() or 200
+        # 内容自适应高度(仅 fit_height 时)
+        if self._fit:
+            try:
+                self._children.update_idletasks()
+                req = self._children.winfo_reqheight() + self._border_w * 2 + (4 if self._shadow else 0)
+                if req > 4 and abs(int(float(self.cget("height") or 0)) - req) > 2:
+                    self.config(height=req)
+                    return  # config 会再触发 Configure -> 重绘
+            except Exception:
+                pass
         h = self.winfo_height() or 100
         r = self._r
-        pts = [r, 0, w - r, 0, w, 0, w, r, w, h - r, w, h, w - r, h, r, h, 0, h, 0, h - r, 0, r, 0, 0, r, 0]
-        self.create_polygon(pts, fill=self._bg, outline=self._border, width=self._border_w, smooth=True)
+        if self._shadow:
+            self.create_polygon(self._rpts(w - 2, h - 4, r, dx=1, dy=3),
+                                fill=SHADOW, outline="", smooth=True)
+        self.create_polygon(self._rpts(w - 2, h - 4, r),
+                            fill=self._bg, outline=self._border,
+                            width=self._border_w, smooth=True)
         self._children.place(x=self._border_w, y=self._border_w,
-                             width=max(1, w - self._border_w * 2),
-                             height=max(1, h - self._border_w * 2))
+                             width=max(1, w - self._border_w * 2 - 2),
+                             height=max(1, h - self._border_w * 2 - 4))
 
     def inner(self):
         return self._children
+
+
+class StepBadge(tk.Canvas):
+    """步骤序号徽章: 浅靛蓝圆 + 主色数字。"""
+
+    def __init__(self, parent, num, size=26):
+        super().__init__(parent, width=size, height=size,
+                         bg=parent.cget("bg"), highlightthickness=0)
+        self.create_oval(1, 1, size - 1, size - 1, fill=PRIMARY_LIGHT, outline="")
+        self.create_text(size / 2, size / 2 + 1, text=str(num),
+                         fill=PRIMARY, font=("Microsoft YaHei UI", 11, "bold"))
+
+
+class DashedZone(tk.Canvas):
+    """虚线圆角拖拽区: normal/hover/active 三态。"""
+
+    _STYLES = {
+        "normal": {"bg": "#f8f9ff", "dash": "#a5b0f3"},
+        "hover": {"bg": "#eef1ff", "dash": PRIMARY},
+        "active": {"bg": "#ecfdf5", "dash": SUCCESS},
+    }
+
+    def __init__(self, parent, height=150, on_click=None):
+        super().__init__(parent, bg=SURFACE, highlightthickness=0,
+                         height=height, cursor="hand2")
+        self._state = "normal"
+        self._on_click = on_click
+        self.bind("<Configure>", lambda e: self._draw())
+        self.bind("<Enter>", lambda e: self._hover(True))
+        self.bind("<Leave>", lambda e: self._hover(False))
+        if on_click:
+            self.bind("<Button-1>", lambda e: on_click())
+        self._draw()
+
+    def _hover(self, inside):
+        if self._state == "active":
+            return
+        self._state = "hover" if inside else "normal"
+        self._draw()
+
+    def set_state(self, state):
+        self._state = state
+        self._draw()
+
+    def _draw(self):
+        self.delete("all")
+        w = self.winfo_width() or 400
+        h = self.winfo_height() or 150
+        st = self._STYLES.get(self._state, self._STYLES["normal"])
+        r = 14
+        pts = [r, 2, w - r, 2, w - 2, 2, w - 2, r, w - 2, h - r, w - 2, h - 2,
+               w - r, h - 2, r, h - 2, 2, h - 2, 2, h - r, 2, r, 2, 2, r, 2]
+        self.create_polygon(pts, fill=st["bg"], outline="", smooth=True)
+        self.create_polygon(pts, fill="", outline=st["dash"], width=2,
+                            dash=(6, 4), smooth=True)
+        cx = w / 2
+        self.icon_id = self.create_text(cx, h * 0.26, text="📥",
+                                        font=("Segoe UI Emoji", 28), fill=PRIMARY)
+        self.title_id = self.create_text(cx, h * 0.60, text="拖拽 PPT / PDF 文件到此处",
+                                         font=FONT_B, fill=TEXT)
+        self.sub_id = self.create_text(cx, h * 0.80, text="或点击选择文件 (.pptx / .ppt / .pdf)",
+                                       font=FONT_XS, fill=TEXT_LIGHT)
+
+
+def paint_vgradient(canvas, w, h, c1, c2):
+    """在 canvas 上画垂直渐变(供登录页品牌面板)。"""
+    canvas.delete("grad")
+    r1, g1, b1 = canvas.winfo_rgb(c1)
+    r2, g2, b2 = canvas.winfo_rgb(c2)
+    steps = max(1, int(h))
+    for i in range(steps):
+        t = i / max(1, steps - 1)
+        r = int((r1 + (r2 - r1) * t) / 256)
+        g = int((g1 + (g2 - g1) * t) / 256)
+        b = int((b1 + (b2 - b1) * t) / 256)
+        canvas.create_line(0, i, w, i, fill=f"#{r:02x}{g:02x}{b:02x}", tags="grad")
+    canvas.tag_lower("grad")
 
 
 class App(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("PPT → Obsidian 智能笔记")
-        self.geometry("1080x820")
-        self.minsize(920, 660)
+        self.geometry("1160x860")
+        self.minsize(980, 700)
         self.configure(bg=BG)
         self._setup_app_icon()           # 窗口/任务栏图标(ico + png)
         self._setup_style()
@@ -160,8 +287,33 @@ class App(tk.Tk):
         st.configure("TButton", padding=(12, 6))
         st.configure("Primary.TButton", background=PRIMARY, foreground="white")
         st.map("Primary.TButton", background=[("active", PRIMARY_HOVER)], foreground=[("!disabled", "white")])
-        st.configure("Ghost.TButton", background="#eef1f6", foreground=TEXT)
-        st.map("Ghost.TButton", background=[("active", "#dde3ec")], foreground=[("!disabled", TEXT)])
+        st.configure("Ghost.TButton", background="#eef0f7", foreground=TEXT_MED)
+        st.map("Ghost.TButton", background=[("active", "#e2e6f0")], foreground=[("!disabled", TEXT_MED)])
+        # 下拉框
+        st.configure("TCombobox", fieldbackground="white", background="white",
+                     bordercolor=BORDER, lightcolor=BORDER, darkcolor=BORDER,
+                     arrowcolor=TEXT_MED, padding=4)
+        st.map("TCombobox",
+               fieldbackground=[("readonly", "white")],
+               bordercolor=[("focus", PRIMARY)],
+               arrowcolor=[("active", PRIMARY)])
+        # 树形列表
+        st.configure("Treeview", background="white", fieldbackground="white",
+                     foreground=TEXT, rowheight=25, font=FONT_S,
+                     bordercolor=BORDER, lightcolor=BORDER, darkcolor=BORDER)
+        st.configure("Treeview.Heading", background=SURFACE_2, foreground=TEXT_MED,
+                     font=("Microsoft YaHei UI", 9, "bold"), relief="flat")
+        st.map("Treeview", background=[("selected", PRIMARY_LIGHT)],
+               foreground=[("selected", TEXT)])
+        # 滚动条(细款)
+        st.configure("Vertical.TScrollbar", background="#d6dae6", troughcolor=BG,
+                     bordercolor=BG, arrowcolor=TEXT_MED, width=10,
+                     lightcolor=BG, darkcolor=BG)
+        st.map("Vertical.TScrollbar", background=[("active", "#b9c0d4")])
+        # 进度条(主色, 加粗)
+        st.configure("Accent.Horizontal.TProgressbar", troughcolor=PRIMARY_SOFT,
+                     background=PRIMARY, thickness=8, bordercolor=BG,
+                     lightcolor=PRIMARY, darkcolor=PRIMARY)
 
     def _show(self, name):
         for k, p in self._pages.items():
@@ -177,42 +329,69 @@ class App(tk.Tk):
     # =================================================================
     def _build_login(self, parent):
         page = tk.Frame(parent, bg=BG)
-        left = tk.Frame(page, bg=PRIMARY)
-        left.place(relx=0, rely=0, relwidth=0.42, relheight=1)
-        tk.Label(left, text="🧠", font=("Segoe UI Emoji", 48), bg=PRIMARY, fg="white").place(relx=0.5, rely=0.34, anchor="center")
-        tk.Label(left, text="PPT → Obsidian", font=("Microsoft YaHei UI", 22, "bold"), bg=PRIMARY, fg="white").place(relx=0.5, rely=0.47, anchor="center")
-        tk.Label(left, text="专业驱动 · 本地优先 · 可生长的知识图谱", font=FONT_S, bg=PRIMARY, fg="#bfdbfe").place(relx=0.5, rely=0.55, anchor="center")
-        tk.Label(left, text="数据保存在本机 · 绑定自己的大模型 API", font=FONT_XS, bg=PRIMARY, fg="#93c5fd").place(relx=0.5, rely=0.70, anchor="center")
+        # 左侧: 渐变品牌面板(靛蓝 -> 紫)
+        grad = tk.Canvas(page, highlightthickness=0, bd=0)
+        grad.place(relx=0, rely=0, relwidth=0.42, relheight=1)
+        def _redraw_grad(e=None):
+            w = grad.winfo_width() or 400
+            h = grad.winfo_height() or 700
+            paint_vgradient(grad, w, h, PRIMARY, ACCENT)
+            # 装饰圆(同族浅色叠加)
+            grad.create_oval(w * 0.55, h * 0.08, w * 1.15, h * 0.38,
+                             fill="#6d64ec", outline="", tags="deco")
+            grad.create_oval(-w * 0.25, h * 0.62, w * 0.35, h * 1.05,
+                             fill="#5a4fe0", outline="", tags="deco")
+            # 文案直接画在画布上, 跟随渐变背景
+            grad.delete("brand")
+            cx = w / 2
+            grad.create_text(cx, h * 0.32, text="🧠", font=("Segoe UI Emoji", 52),
+                             fill="white", tags="brand")
+            grad.create_text(cx, h * 0.46, text="PPT → Obsidian",
+                             font=("Microsoft YaHei UI", 19, "bold"),
+                             fill="white", tags="brand")
+            grad.create_text(cx, h * 0.54, text="专业驱动 · 本地优先 · 可生长的知识图谱",
+                             font=FONT, fill="#cdd3ff", tags="brand")
+            grad.create_text(cx, h * 0.72, text="数据保存在本机 · 绑定自己的大模型 API",
+                             font=FONT_XS, fill="#aab3f8", tags="brand")
+            grad.tag_raise("brand")
+            grad.tag_lower("deco")
+            grad.tag_lower("grad")
+        grad.bind("<Configure>", _redraw_grad)
 
+        # 右侧: 居中圆角登录卡(带投影)
         right = tk.Frame(page, bg=BG)
         right.place(relx=0.42, rely=0, relwidth=0.58, relheight=1)
-        card = tk.Frame(right, bg=SURFACE, highlightbackground=BORDER, highlightthickness=1)
-        card.place(relx=0.5, rely=0.5, anchor="center", width=400, height=500)
-        tk.Label(card, text="欢迎使用", font=FONT_TITLE, bg=SURFACE, fg=TEXT).pack(pady=(38, 2))
-        tk.Label(card, text="登录你的本地账号", font=FONT_S, bg=SURFACE, fg=TEXT_MED).pack()
+        shell = tk.Frame(right, bg=BG)
+        shell.place(relx=0.5, rely=0.5, anchor="center", width=400, height=720)
+        card = RoundedFrame(shell, radius=18, bg=SURFACE, border=BORDER, border_w=1,
+                            fit_height=False)
+        card.pack(fill="both", expand=True)
+        inner = card.inner()
+        tk.Label(inner, text="欢迎使用", font=FONT_TITLE, bg=SURFACE, fg=TEXT).pack(pady=(30, 2))
+        tk.Label(inner, text="登录你的本地账号", font=FONT, bg=SURFACE, fg=TEXT_MED).pack()
 
-        tk.Label(card, text="账号", bg=SURFACE, fg=TEXT_MED, font=FONT_S, anchor="w").pack(fill="x", padx=40, pady=(26, 2))
+        tk.Label(inner, text="账号", bg=SURFACE, fg=TEXT_MED, font=FONT_S, anchor="w").pack(fill="x", padx=40, pady=(28, 2))
         self.username_var = tk.StringVar(value=self.mgr.remember_last_username() or "")
-        self._entry(card, self.username_var)
-        tk.Label(card, text="密码", bg=SURFACE, fg=TEXT_MED, font=FONT_S, anchor="w").pack(fill="x", padx=40, pady=(14, 2))
+        self._entry(inner, self.username_var)
+        tk.Label(inner, text="密码", bg=SURFACE, fg=TEXT_MED, font=FONT_S, anchor="w").pack(fill="x", padx=40, pady=(16, 2))
         self.pass_var = tk.StringVar()
-        self._entry(card, self.pass_var, show="●")
-        self.auth_err = tk.Label(card, text="", bg=SURFACE, fg=DANGER, font=FONT_S)
-        self.auth_err.pack(pady=(10, 0))
-        btns = tk.Frame(card, bg=SURFACE)
-        btns.pack(pady=(18, 4))
-        tk.Button(btns, text="登  录", command=self._do_login, bg=PRIMARY, fg="white",
-                  activebackground=PRIMARY_HOVER, relief="flat", font=FONT_B, width=15, cursor="hand2", bd=0).pack(side="left", padx=5)
-        tk.Button(btns, text="注册新账号", command=self._do_register, bg="#eef1f6", fg=TEXT,
-                  activebackground="#dde3ec", relief="flat", font=FONT, width=14, cursor="hand2", bd=0).pack(side="left", padx=5)
-        tk.Label(card, text="· 首次使用请注册本地账号\n· 绑定自己的大模型 API 以获得更准确笔记\n· 未绑定也能用本地规则模式离线生成",
-                 justify="left", bg=SURFACE, fg=TEXT_LIGHT, font=FONT_XS).pack(side="bottom", pady=16)
+        self._entry(inner, self.pass_var, show="●")
+        self.auth_err = tk.Label(inner, text="", bg=SURFACE, fg=DANGER, font=FONT_S)
+        self.auth_err.pack(pady=(12, 0))
+        mkbtn(inner, "登  录", self._do_login, "primary", font=FONT_B,
+              padx=0, pady=9).pack(fill="x", padx=40, pady=(18, 6))
+        mkbtn(inner, "注册新账号", self._do_register, "ghost", font=FONT,
+              padx=0, pady=8).pack(fill="x", padx=40)
+        tk.Label(inner, text="首次使用请注册 · 未绑定模型也能离线生成",
+                 justify="center", bg=SURFACE, fg=TEXT_LIGHT, font=FONT_XS,
+                 wraplength=340).pack(side="bottom", padx=30, pady=14)
         return page
 
     def _entry(self, parent, var, show=None):
         e = tk.Entry(parent, textvariable=var, font=FONT, relief="solid", bd=1,
-                     highlightthickness=1, highlightcolor=PRIMARY, highlightbackground=BORDER, bg="white", show=show)
-        e.pack(fill="x", padx=40)
+                     highlightthickness=1, highlightcolor=PRIMARY,
+                     highlightbackground=BORDER, bg="white", show=show)
+        e.pack(fill="x", padx=40, ipady=5)
         return e
 
     def _do_login(self):
@@ -255,11 +434,40 @@ class App(tk.Tk):
     def _build_header(self, parent):
         hdr = tk.Frame(parent, bg=SURFACE, highlightbackground=BORDER, highlightthickness=1)
         hdr.pack(fill="x")
-        tk.Label(hdr, text="📚  PPT → Obsidian 智能笔记", font=FONT_H1, bg=SURFACE).pack(side="left", padx=18, pady=11)
-        self.user_label = tk.Label(hdr, text="", bg=SURFACE, fg=TEXT_MED, font=FONT_S)
-        self.user_label.pack(side="right", padx=18)
-        tk.Button(hdr, text="退出", command=self._logout, bg="#eef1f6", fg=TEXT,
-                  relief="flat", cursor="hand2", font=FONT_S, bd=0).pack(side="right", padx=(0, 4), pady=9)
+        # 应用图标(优先 assets/icon_32.png 预缩放版, 避免 subsample 锯齿; 失败退回 emoji)
+        icon_shown = False
+        try:
+            if getattr(sys, "frozen", False):
+                base = getattr(sys, "_MEIPASS", os.path.dirname(__file__))
+            else:
+                base = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+            png32 = os.path.join(base, "assets", "icon_32.png")
+            if os.path.isfile(png32):
+                self._hdr_icon = tk.PhotoImage(file=png32)
+                tk.Label(hdr, image=self._hdr_icon, bg=SURFACE).pack(side="left", padx=(18, 10), pady=10)
+                icon_shown = True
+        except Exception:
+            pass
+        if not icon_shown:
+            tk.Label(hdr, text="📚", font=("Segoe UI Emoji", 20),
+                     bg=SURFACE).pack(side="left", padx=(18, 10), pady=8)
+        tcol = tk.Frame(hdr, bg=SURFACE)
+        tcol.pack(side="left", pady=8)
+        tk.Label(tcol, text="PPT → Obsidian 智能笔记", font=FONT_H1,
+                 bg=SURFACE, fg=TEXT).pack(anchor="w")
+        tk.Label(tcol, text="课件一键变身结构化笔记", font=FONT_XS,
+                 bg=SURFACE, fg=TEXT_LIGHT).pack(anchor="w")
+        mkbtn(hdr, "退出登录", self._logout, "ghost",
+              font=FONT_S, padx=14, pady=5).pack(side="right", padx=(6, 18), pady=12)
+        # 用户徽章: 头像圆(首字) + 用户名
+        chip = tk.Frame(hdr, bg=PRIMARY_SOFT,
+                        highlightbackground=PRIMARY_LIGHT, highlightthickness=1)
+        chip.pack(side="right", pady=12)
+        self._avatar = tk.Canvas(chip, width=26, height=26, bg=PRIMARY_SOFT,
+                                 highlightthickness=0)
+        self._avatar.pack(side="left", padx=(8, 6), pady=4)
+        self.user_label = tk.Label(chip, text="", bg=PRIMARY_SOFT, fg=PRIMARY, font=FONT_S)
+        self.user_label.pack(side="left", padx=(0, 10))
 
     # ---------------- 左栏 ----------------
     def _build_left(self, parent):
@@ -285,6 +493,7 @@ class App(tk.Tk):
                 pass
         canvas.bind("<MouseWheel>", _wheel)
         inner.bind("<MouseWheel>", _wheel)
+        self._left_canvas = canvas
 
         # 顶部: 课程/文件夹管理器(大学课程多, 一科一夹)
         self._build_course_section(inner)
@@ -293,35 +502,44 @@ class App(tk.Tk):
         # 大模型 API 管理
         self._build_model_section(inner)
 
+    # -- 通用: 步骤标题(徽章 + 标题 + 副标题) --
+    def _step_head(self, parent, num, title, sub=None):
+        row = tk.Frame(parent, bg=SURFACE)
+        StepBadge(row, num).pack(side="left", padx=(0, 10))
+        col = tk.Frame(row, bg=SURFACE)
+        col.pack(side="left")
+        tk.Label(col, text=title, font=FONT_H2, bg=SURFACE, fg=TEXT).pack(anchor="w")
+        if sub:
+            tk.Label(col, text=sub, font=FONT_XS, bg=SURFACE, fg=TEXT_LIGHT).pack(anchor="w")
+        return row
+
     # -- STEP 0: 我的课程 / 文件夹管理器 --
     def _build_course_section(self, parent):
-        card = tk.Frame(parent, bg=SURFACE, highlightbackground=BORDER, highlightthickness=1)
-        card.pack(fill="x", pady=(0, 12))
-        inner = card
+        card = RoundedFrame(parent, radius=16)
+        card.pack(fill="x", pady=(0, 14))
+        inner = card.inner()
         inner.columnconfigure(0, weight=1)
 
-        # 标题行 + Vault 根按钮
+        # 标题行 + Vault 根按钮(先 pack 右侧按钮, 保证它拿满所需宽度不被挤压)
         title_row = tk.Frame(inner, bg=SURFACE)
         title_row.pack(fill="x", padx=18, pady=(16, 2))
-        tk.Label(title_row, text="🗂  STEP 0 · 我的课程", font=FONT_H2, bg=SURFACE).pack(side="left")
-        self.set_root_btn = tk.Button(title_row, text="设置 Vault 根", command=self._choose_vault_root,
-                                      bg="#eef1f6", fg=TEXT, relief="flat", cursor="hand2", font=FONT_S, bd=0)
+        self.set_root_btn = mkbtn(title_row, "设置 Vault 根", self._choose_vault_root,
+                                  "ghost", FONT_S, padx=12, pady=4)
         self.set_root_btn.pack(side="right")
+        self._step_head(title_row, 0, "我的课程", "一科一夹，互不混杂"
+                        ).pack(side="left", fill="x", expand=True)
         # Vault 根当前路径
         self.root_path_lbl = tk.Label(inner, text="尚未设置 → 请先选一个 Vault 根(如 Obsidian 仓库目录)",
                                       bg=SURFACE, fg=TEXT_LIGHT, font=FONT_XS, anchor="w", wraplength=380, justify="left")
-        self.root_path_lbl.pack(fill="x", padx=20, pady=(0, 6))
-
-        # 说明
-        tk.Label(inner, text="每门课一个文件夹，选中即把输出指向该课程夹，一科一夹互不混杂",
-                 bg=SURFACE, fg=TEXT_LIGHT, font=FONT_XS, anchor="w", wraplength=380, justify="left"
-                 ).pack(fill="x", padx=20, pady=(0, 4))
+        self.root_path_lbl.pack(fill="x", padx=20, pady=(4, 8))
 
         # 课程列表(可滚动)
         list_holder = tk.Frame(inner, bg=SURFACE)
         list_holder.pack(fill="x", padx=18)
-        self.course_lb = tk.Listbox(list_holder, height=4, font=FONT_S, bg="white",
-                                    relief="solid", bd=1, highlightbackground=BORDER,
+        self.course_lb = tk.Listbox(list_holder, height=4, font=FONT_S, bg=SURFACE_2,
+                                    relief="flat", bd=0, highlightthickness=1,
+                                    highlightbackground=BORDER, highlightcolor=PRIMARY,
+                                    selectbackground=PRIMARY_LIGHT, selectforeground=TEXT,
                                     activestyle="none", exportselection=False)
         self.course_lb.pack(side="left", fill="x", expand=True)
         sc = ttk.Scrollbar(list_holder, orient="vertical", command=self.course_lb.yview)
@@ -332,62 +550,61 @@ class App(tk.Tk):
 
         # 新建课程行
         new_row = tk.Frame(inner, bg=SURFACE)
-        new_row.pack(fill="x", padx=18, pady=(6, 2))
+        new_row.pack(fill="x", padx=18, pady=(8, 2))
         self.new_course_var = tk.StringVar()
         ent = tk.Entry(new_row, textvariable=self.new_course_var, font=FONT_S, relief="solid", bd=1,
-                       highlightbackground=BORDER, bg="white")
-        ent.pack(side="left", fill="x", expand=True, padx=(0, 6))
+                       highlightbackground=BORDER, highlightcolor=PRIMARY, bg="white")
+        ent.pack(side="left", fill="x", expand=True, padx=(0, 6), ipady=3)
         ent.bind("<Return>", lambda e: self._new_course())
         ent.bind("<FocusIn>", lambda e: self._clear_course_ph(ent))
         self.new_course_entry = ent
         self._course_name_ph = True
         self._reset_course_ph()
-        tk.Button(new_row, text="➕ 新建文件夹", command=self._new_course,
-                  bg=PRIMARY, fg="white", activebackground=PRIMARY_HOVER,
-                  relief="flat", cursor="hand2", font=FONT_S, bd=0).pack(side="right")
+        mkbtn(new_row, "＋ 新建课程", self._new_course, "primary",
+              FONT_S, padx=12, pady=4).pack(side="right")
 
         # 操作按钮行
         op_row = tk.Frame(inner, bg=SURFACE)
-        op_row.pack(fill="x", padx=18, pady=(4, 14))
-        tk.Button(op_row, text="📂 打开该课程文件夹", command=self._open_active_folder,
-                  bg="#eef1f6", fg=TEXT, relief="flat", cursor="hand2", font=FONT_S, bd=0).pack(side="left")
-        tk.Button(op_row, text="🎯 在该课程夹选 PPT", command=self._pick_ppt_in_course,
-                  bg="#eef1f6", fg=TEXT, relief="flat", cursor="hand2", font=FONT_S, bd=0).pack(side="left", padx=(8, 0))
-        tk.Button(op_row, text="✂ 移除该课程", command=self._remove_course,
-                  bg="#fef2f2", fg=DANGER, relief="flat", cursor="hand2", font=FONT_S, bd=0).pack(side="right")
+        op_row.pack(fill="x", padx=18, pady=(6, 12))
+        mkbtn(op_row, "📂 打开课程文件夹", self._open_active_folder,
+              "ghost", FONT_S, padx=10, pady=4).pack(side="left")
+        mkbtn(op_row, "🎯 在此课程选课件", self._pick_ppt_in_course,
+              "ghost", FONT_S, padx=10, pady=4).pack(side="left", padx=(8, 0))
+        mkbtn(op_row, "✂ 移除", self._remove_course,
+              "danger", FONT_S, padx=10, pady=4).pack(side="right")
 
         self.course_hint = tk.Label(inner, text="尚未创建任何课程。新建后会自动在 Vault 根下建同名文件夹",
                                     bg=SURFACE, fg=TEXT_LIGHT, font=FONT_XS, anchor="w", wraplength=380, justify="left")
-        self.course_hint.pack(fill="x", padx=20, pady=(0, 14))
+        self.course_hint.pack(fill="x", padx=20, pady=(0, 12))
 
-        # ---- 课程夹内容浏览器: 直接列出该课程夹里已生成的笔记夹 / 笔记 md ----
+        # ---- 课程夹内容浏览器 ----
         browse_title = tk.Frame(inner, bg=SURFACE)
-        browse_title.pack(fill="x", padx=18, pady=(0, 2))
-        tk.Label(browse_title, text="📂 该课程已生成的笔记（双击在 Obsidian 打开）",
+        browse_title.pack(fill="x", padx=18, pady=(0, 4))
+        tk.Label(browse_title, text="📂 已生成的笔记（双击用 Obsidian 打开）",
                  bg=SURFACE, fg=TEXT_MED, font=FONT_S, anchor="w").pack(side="left")
-        tk.Button(browse_title, text="↻ 刷新", command=self._refresh_course_files,
-                  bg="#eef1f6", fg=TEXT, relief="flat", cursor="hand2", font=FONT_XS, bd=0).pack(side="right")
+        mkbtn(browse_title, "↻ 刷新", self._refresh_course_files,
+              "ghost", FONT_XS, padx=8, pady=2).pack(side="right")
         tree_holder = tk.Frame(inner, bg=SURFACE)
-        tree_holder.pack(fill="x", padx=18, pady=(0, 4))
+        tree_holder.pack(fill="x", padx=18, pady=(0, 6))
         self.course_tree = ttk.Treeview(tree_holder, show="tree", height=6, selectmode="browse")
         self.course_tree.pack(side="left", fill="both", expand=True)
         tsc = ttk.Scrollbar(tree_holder, orient="vertical", command=self.course_tree.yview)
         self.course_tree.configure(yscrollcommand=tsc.set)
         tsc.pack(side="right", fill="y")
         self.course_tree.bind("<Double-Button-1>", self._on_tree_open)
-        self.course_tree.tag_configure("dir", foreground="#2563eb")
-        self.course_tree.tag_configure("md", foreground="#0f172a")
-        self.course_tree.tag_configure("img", foreground="#94a3b8")
+        self.course_tree.tag_configure("dir", foreground=PRIMARY)
+        self.course_tree.tag_configure("md", foreground=TEXT)
+        self.course_tree.tag_configure("img", foreground=TEXT_LIGHT)
         # 该浏览器操作按钮
         browse_op = tk.Frame(inner, bg=SURFACE)
-        browse_op.pack(fill="x", padx=18, pady=(2, 14))
-        tk.Button(browse_op, text="📖 打开选中", command=self._open_selected_entry,
-                  bg="#eef1f6", fg=TEXT, relief="flat", cursor="hand2", font=FONT_S, bd=0).pack(side="left")
-        tk.Button(browse_op, text="✏️ 重命名", command=self._rename_selected_entry,
-                  bg="#eef1f6", fg=TEXT, relief="flat", cursor="hand2", font=FONT_S, bd=0).pack(side="left", padx=(8, 0))
+        browse_op.pack(fill="x", padx=18, pady=(2, 12))
+        mkbtn(browse_op, "📖 打开选中", self._open_selected_entry,
+              "ghost", FONT_S, padx=10, pady=4).pack(side="left")
+        mkbtn(browse_op, "✏️ 重命名", self._rename_selected_entry,
+              "ghost", FONT_S, padx=10, pady=4).pack(side="left", padx=(8, 0))
         self.course_browse_hint = tk.Label(inner, text="选中一门课程后，这里会列出它里面已生成的内容",
                                            bg=SURFACE, fg=TEXT_LIGHT, font=FONT_XS, anchor="w", wraplength=380, justify="left")
-        self.course_browse_hint.pack(fill="x", padx=20, pady=(0, 6))
+        self.course_browse_hint.pack(fill="x", padx=20, pady=(0, 8))
 
     # -- 课程数据层(存于账号 prefs, key=courses) --
     def _load_courses(self):
@@ -851,34 +1068,21 @@ class App(tk.Tk):
 
     # -- PPT 大拖拽区 --
     def _build_ppt_dropzone(self, parent):
-        card = tk.Frame(parent, bg=SURFACE, highlightbackground=BORDER, highlightthickness=1)
-        card.pack(fill="x", pady=(0, 12))
-        inner = card
+        card = RoundedFrame(parent, radius=16)
+        card.pack(fill="x", pady=(0, 14))
+        inner = card.inner()
         inner.columnconfigure(0, weight=1)
-        tk.Label(inner, text="STEP 1 · 拖入 PPT 课件", font=FONT_H2, bg=SURFACE).pack(padx=20, pady=(16, 10), anchor="w")
+        head = self._step_head(inner, 1, "选择课件", "支持 .pptx / .ppt / .pdf")
+        head.pack(fill="x", padx=18, pady=(16, 10), anchor="w")
 
-        # 主拖拽框
-        dz = tk.Frame(inner, bg="#f1f5ff", highlightbackground=PRIMARY, highlightthickness=2,
-                      cursor="hand2", height=140)
-        dz.pack(fill="x", padx=20, pady=(0, 6))
-        dz.pack_propagate(False)
-        dz.bind("<Button-1>", lambda e: self._choose_ppt())
-
-        self.drop_icon = tk.Label(dz, text="📥", font=("Segoe UI Emoji", 30), bg="#f1f5ff", fg=PRIMARY)
-        self.drop_icon.place(relx=0.5, rely=0.34, anchor="center")
-        self.drop_title = tk.Label(dz, text="拖拽 PPT / PDF 文件到此处", font=FONT_B, bg="#f1f5ff", fg=TEXT)
-        self.drop_title.place(relx=0.5, rely=0.62, anchor="center")
-        self.drop_sub = tk.Label(dz, text="或点击选择文件 (.pptx / .ppt / .pdf)", font=FONT_XS, bg="#f1f5ff", fg=TEXT_LIGHT)
-        self.drop_sub.place(relx=0.5, rely=0.80, anchor="center")
-        for w in (dz, self.drop_icon, self.drop_title, self.drop_sub):
-            w.bind("<Button-1>", lambda e: self._choose_ppt())
-            w.bind("<Enter>", lambda e: dz.config(bg="#e3ecff", highlightbackground=PRIMARY_HOVER))
-            w.bind("<Leave>", lambda e: dz.config(bg="#f1f5ff", highlightbackground=PRIMARY))
+        # 虚线拖拽框(三态: normal/hover/active)
+        dz = DashedZone(inner, height=150, on_click=self._choose_ppt)
+        dz.pack(fill="x", padx=18, pady=(0, 6))
         self.drop_zone = dz
         self._setup_dnd(dz)
         # PPT 文件名提示
         self.ppt_file_label = tk.Label(inner, text="", bg=SURFACE, fg=SUCCESS, font=FONT_S, anchor="w")
-        self.ppt_file_label.pack(fill="x", padx=22, pady=(2, 12))
+        self.ppt_file_label.pack(fill="x", padx=22, pady=(2, 14))
 
     def _choose_ppt(self):
         p = filedialog.askopenfilename(title="选择课件",
@@ -893,11 +1097,12 @@ class App(tk.Tk):
         if not os.path.exists(path):
             return
         self._ppt_path = path
-        self.drop_title.config(text="✅ " + os.path.basename(path), fg=SUCCESS)
-        self.drop_sub.config(text=os.path.dirname(path), fg=TEXT_LIGHT)
+        dz = self.drop_zone
+        dz.set_state("active")
+        dz.itemconfig(dz.icon_id, text="✅", fill=SUCCESS)
+        dz.itemconfig(dz.title_id, text=os.path.basename(path), fill=SUCCESS)
+        dz.itemconfig(dz.sub_id, text=os.path.dirname(path), fill=TEXT_LIGHT)
         self.ppt_file_label.config(text=f"已选择: {os.path.basename(path)}")
-        self.drop_zone.config(bg="#e9fbf2", highlightbackground=SUCCESS)
-        self.drop_icon.config(text="✅", fg=SUCCESS)
 
     def _setup_dnd(self, widget):
         try:
@@ -922,37 +1127,40 @@ class App(tk.Tk):
 
     # -- 大模型 API 管理(内嵌) --
     def _build_model_section(self, parent):
-        card = RoundedFrame(parent, radius=14, bg=SURFACE, border=BORDER, border_w=1)
+        card = RoundedFrame(parent, radius=16)
         card.pack(fill="x", pady=(0, 4))
         inner = card.inner()
         inner.columnconfigure(0, weight=1)
-        tk.Label(inner, text="STEP 2 · 大模型 API", font=FONT_H2, bg=SURFACE).grid(row=0, column=0, sticky="w", padx=20, pady=(16, 6))
+        head = self._step_head(inner, 2, "大模型 API", "绑定在线模型获得更准笔记，也可离线生成")
+        head.grid(row=0, column=0, sticky="w", padx=18, pady=(16, 8))
 
         # 当前模型下拉 + 使用方式
         mode_row = tk.Frame(inner, bg=SURFACE)
-        mode_row.grid(row=1, column=0, sticky="ew", padx=20)
+        mode_row.grid(row=1, column=0, sticky="ew", padx=18)
         self.model_var = tk.StringVar(value="offline")
         tk.Radiobutton(mode_row, text="本地规则(离线)", variable=self.model_var, value="offline",
-                       bg=SURFACE, font=FONT_S, cursor="hand2").pack(side="left")
+                       bg=SURFACE, activebackground=SURFACE, selectcolor="white",
+                       highlightthickness=0, font=FONT_S, fg=TEXT_MED, cursor="hand2").pack(side="left")
         tk.Radiobutton(mode_row, text="使用模型", variable=self.model_var, value="online",
-                       bg=SURFACE, font=FONT_S, cursor="hand2").pack(side="left", padx=(12, 6))
+                       bg=SURFACE, activebackground=SURFACE, selectcolor="white",
+                       highlightthickness=0, font=FONT_S, fg=TEXT_MED, cursor="hand2").pack(side="left", padx=(12, 6))
         self.model_dd = ttk.Combobox(mode_row, state="readonly", font=FONT_S)
         self.model_dd.pack(side="left", fill="x", expand=True)
         self.model_dd.bind("<<ComboboxSelected>>", self._on_model_select)
 
         # 测试连接 / 管理按钮
         btn_row = tk.Frame(inner, bg=SURFACE)
-        btn_row.grid(row=2, column=0, sticky="ew", padx=20, pady=(8, 0))
-        tk.Button(btn_row, text="➕ 添加/管理模型", command=self._open_model_manage,
-                  bg="#eef1f6", fg=TEXT, relief="flat", cursor="hand2", font=FONT_S, bd=0).pack(side="left")
-        tk.Button(btn_row, text="测试连接", command=self._test_model,
-                  bg="#eef1f6", fg=TEXT, relief="flat", cursor="hand2", font=FONT_S, bd=0).pack(side="left", padx=(8, 0))
+        btn_row.grid(row=2, column=0, sticky="ew", padx=18, pady=(10, 0))
+        mkbtn(btn_row, "⚙ 添加/管理模型", self._open_model_manage,
+              "ghost", FONT_S, padx=10, pady=4).pack(side="left")
+        mkbtn(btn_row, "⚡ 测试连接", self._test_model,
+              "ghost", FONT_S, padx=10, pady=4).pack(side="left", padx=(8, 0))
 
         # 提示文案
         self.model_hint = tk.Label(inner, text="未绑定模型 → 使用本地规则模式(离线)生成基础笔记",
                                    bg=SURFACE, fg=TEXT_MED, font=FONT_XS, justify="left",
                                    anchor="w", wraplength=360)
-        self.model_hint.grid(row=3, column=0, sticky="ew", padx=22, pady=(10, 18))
+        self.model_hint.grid(row=3, column=0, sticky="ew", padx=20, pady=(10, 16))
 
     # ---------------- 右栏 ----------------
     def _build_right(self, parent):
@@ -980,6 +1188,7 @@ class App(tk.Tk):
                 pass
         canvas.bind("<MouseWheel>", _wheel_yscroll)
         body_inner.bind("<MouseWheel>", _wheel_yscroll)
+        self._right_canvas = canvas
         for _w in (body_inner, canvas, vsb):
             pass  # 各子卡自带滚动无需重复绑定
 
@@ -993,13 +1202,14 @@ class App(tk.Tk):
         self._build_chat_section(body_inner)
 
     def _build_setup_section(self, parent):
-        card = tk.Frame(parent, bg=SURFACE, highlightbackground=BORDER, highlightthickness=1)
-        card.pack(fill="x", pady=(0, 12))
-        inner = card
+        card = RoundedFrame(parent, radius=16)
+        card.pack(fill="x", pady=(0, 14))
+        inner = card.inner()
         inner.columnconfigure(0, weight=1)
-        tk.Label(inner, text="STEP 3 · 选择专业与输出目录", font=FONT_H2, bg=SURFACE).grid(row=0, column=0, sticky="w", padx=18, pady=(16, 6))
+        head = self._step_head(inner, 3, "专业与输出目录", "专业知识框架让笔记更贴合学科")
+        head.grid(row=0, column=0, sticky="w", padx=18, pady=(16, 8))
 
-        # 专业按钮
+        # 专业按钮(胶囊切换)
         self.prof_buttons = {}
         prof_row = tk.Frame(inner, bg=SURFACE)
         prof_row.grid(row=1, column=0, sticky="ew", padx=18)
@@ -1008,39 +1218,44 @@ class App(tk.Tk):
         else:
             for i, p in enumerate(self.profs):
                 b = tk.Button(prof_row, text=p.name, font=FONT_S, relief="flat", cursor="hand2",
-                              command=lambda pid=p.id: self._pick_prof(pid), bd=0)
-                b.pack(side="left", padx=(0 if i == 0 else 6), ipadx=12, ipady=4)
+                              command=lambda pid=p.id: self._pick_prof(pid), bd=0,
+                              padx=12, pady=5)
+                b.pack(side="left", padx=(0 if i == 0 else 6))
                 self.prof_buttons[p.id] = b
         self.prof_detail = tk.Label(inner, text="", bg=SURFACE, fg=TEXT_LIGHT, font=FONT_XS, anchor="w")
-        self.prof_detail.grid(row=2, column=0, sticky="w", padx=18, pady=(4, 4))
+        self.prof_detail.grid(row=2, column=0, sticky="w", padx=18, pady=(6, 4))
 
         # Vault 输出目录
         vault_row = tk.Frame(inner, bg=SURFACE)
         vault_row.grid(row=3, column=0, sticky="ew", padx=18, pady=(4, 6))
-        tk.Label(vault_row, text="输出目录:", bg=SURFACE, fg=TEXT_MED, font=FONT_S).pack(side="left")
+        tk.Label(vault_row, text="输出目录", bg=SURFACE, fg=TEXT_MED, font=FONT_S).pack(side="left")
         self.vault_entry = tk.Entry(vault_row, font=FONT_S, relief="solid", bd=1,
-                                    highlightbackground=BORDER, bg="white")
-        self.vault_entry.pack(side="left", fill="x", expand=True, padx=(6, 6))
+                                    highlightbackground=BORDER, highlightcolor=PRIMARY, bg="white")
+        self.vault_entry.pack(side="left", fill="x", expand=True, padx=(6, 6), ipady=3)
         self.vault_entry.bind("<Return>", lambda e: self._set_vault_from_entry())
-        tk.Button(vault_row, text="选择", command=self._choose_vault, bg="#eef1f6", fg=TEXT,
-                  relief="flat", cursor="hand2", font=FONT_S, bd=0).pack(side="right")
+        mkbtn(vault_row, "选择…", self._choose_vault, "ghost",
+              FONT_S, padx=10, pady=3).pack(side="right")
         tk.Label(inner, text="提示: 选择已建好的 Obsidian Vault 文件夹，若无则新建空文件夹即可",
                  bg=SURFACE, fg=TEXT_LIGHT, font=FONT_XS, anchor="w").grid(
             row=4, column=0, sticky="w", padx=18, pady=(0, 14))
 
     def _build_run_section(self, parent):
-        card = tk.Frame(parent, bg=SURFACE, highlightbackground=BORDER, highlightthickness=1)
-        card.pack(fill="x", pady=(0, 12))
-        inner = card
+        card = RoundedFrame(parent, radius=16)
+        card.pack(fill="x", pady=(0, 14))
+        inner = card.inner()
         inner.columnconfigure(0, weight=1)
         self.run_btn = tk.Button(inner, text="🚀  生成 Obsidian 笔记", command=self._run,
                                  bg=PRIMARY, fg="white", activebackground=PRIMARY_HOVER,
-                                 font=FONT_B, relief="flat", cursor="hand2", bd=0, height=2)
-        self.run_btn.grid(row=0, column=0, sticky="ew", padx=18, pady=(14, 6))
+                                 activeforeground="white", font=("Microsoft YaHei UI", 13, "bold"),
+                                 relief="flat", cursor="hand2", bd=0, pady=12)
+        self.run_btn.grid(row=0, column=0, sticky="ew", padx=18, pady=(16, 8))
+        self.run_btn.bind("<Enter>", lambda e: self.run_btn.config(
+            bg=PRIMARY_HOVER) if str(self.run_btn["state"]) != "disabled" else None)
+        self.run_btn.bind("<Leave>", lambda e: self.run_btn.config(bg=PRIMARY))
         # 输出形态: 讲义式(默认) / 概念卡片
         mode_row = tk.Frame(inner, bg=SURFACE)
-        mode_row.grid(row=1, column=0, sticky="ew", padx=18, pady=(0, 4))
-        tk.Label(mode_row, text="笔记形态:", bg=SURFACE, fg=TEXT_MED, font=FONT_S).pack(side="left")
+        mode_row.grid(row=1, column=0, sticky="ew", padx=18, pady=(0, 8))
+        tk.Label(mode_row, text="笔记形态", bg=SURFACE, fg=TEXT_MED, font=FONT_S).pack(side="left")
         self.mode_var = tk.StringVar(value="lecture")
         self.mode_dd = ttk.Combobox(
             mode_row, textvariable=self.mode_var, state="readonly", font=FONT_S,
@@ -1055,38 +1270,41 @@ class App(tk.Tk):
         self._mode_to_display = {v: k for k, v in self._mode_values.items()}
         self.mode_dd.bind("<<ComboboxSelected>>", self._on_mode_change)
         # 进度条
-        self.progress = ttk.Progressbar(inner, mode="determinate", maximum=100)
+        self.progress = ttk.Progressbar(inner, mode="determinate", maximum=100,
+                                        style="Accent.Horizontal.TProgressbar")
         self.progress.grid(row=2, column=0, sticky="ew", padx=18)
         self.status_label = tk.Label(inner, text="就绪", font=FONT_S, bg=SURFACE, fg=TEXT_MED, anchor="w")
-        self.status_label.grid(row=3, column=0, sticky="w", padx=20, pady=(4, 12))
+        self.status_label.grid(row=3, column=0, sticky="w", padx=20, pady=(6, 14))
 
     def _build_result_section(self, parent):
-        card = tk.Frame(parent, bg=SURFACE, highlightbackground=BORDER, highlightthickness=1)
-        card.pack(fill="x", pady=(0, 10))
-        inner = card
+        card = RoundedFrame(parent, radius=16)
+        card.pack(fill="x", pady=(0, 12))
+        inner = card.inner()
         inner.columnconfigure(0, weight=1)
-        tk.Label(inner, text="📁 生成结果", font=FONT_H2, bg=SURFACE).grid(row=0, column=0, sticky="w", padx=18, pady=(12, 6))
+        tk.Label(inner, text="📁  生成结果", font=FONT_H2, bg=SURFACE, fg=TEXT).grid(
+            row=0, column=0, sticky="w", padx=18, pady=(14, 8))
 
         # 地址 + 打开按钮
         addr_row = tk.Frame(inner, bg=SURFACE)
         addr_row.grid(row=1, column=0, sticky="ew", padx=18)
-        tk.Label(addr_row, text="输出地址:", bg=SURFACE, fg=TEXT_MED, font=FONT_S).pack(side="left")
+        tk.Label(addr_row, text="输出地址", bg=SURFACE, fg=TEXT_MED, font=FONT_S).pack(side="left")
         self.result_path = tk.Label(addr_row, text="尚未生成", bg=SURFACE, fg=TEXT_LIGHT, font=FONT_S,
                                     anchor="w")
-        self.result_path.pack(side="left", fill="x", expand=True, padx=(4, 6))
-        self.open_btn = tk.Button(addr_row, text="打开文件夹", command=self._open_folder,
-                                  state="disabled", bg=PRIMARY, fg="white", activebackground=PRIMARY_HOVER,
-                                  relief="flat", cursor="hand2", font=FONT_S, bd=0)
+        self.result_path.pack(side="left", fill="x", expand=True, padx=(6, 6))
+        self.open_btn = mkbtn(addr_row, "打开文件夹", self._open_folder,
+                              "primary", FONT_S, padx=12, pady=4)
+        self.open_btn.config(state="disabled", disabledforeground="#c7c9d8")
         self.open_btn.pack(side="right")
-        # 日志区(定高, 让下方对话框有空间)
-        self.log_text = tk.Text(inner, bg="#0f172a", fg="#e2e8f0", font=("Consolas", 9),
+        # 日志区(深色控制台)
+        self.log_text = tk.Text(inner, bg="#151b2e", fg="#dbe2f4", font=("Consolas", 9),
                                 relief="flat", bd=0, state="disabled", wrap="word",
-                                padx=12, pady=8, height=6)
-        self.log_text.grid(row=2, column=0, sticky="ew", padx=18, pady=(8, 14))
-        self.log_text.tag_config("ok", foreground="#34d399")
-        self.log_text.tag_config("err", foreground="#f87171")
-        self.log_text.tag_config("info", foreground="#60a5fa")
-        self.log_text.tag_config("dim", foreground="#94a3b8")
+                                padx=12, pady=8, height=6, highlightthickness=1,
+                                highlightbackground=BORDER)
+        self.log_text.grid(row=2, column=0, sticky="ew", padx=18, pady=(10, 16))
+        self.log_text.tag_config("ok", foreground="#4ade80")
+        self.log_text.tag_config("err", foreground="#fb7185")
+        self.log_text.tag_config("info", foreground="#93a5fd")
+        self.log_text.tag_config("dim", foreground="#8b93a7")
 
     # ---------------- 专业选择 ----------------
     def _pick_prof(self, pid):
@@ -1096,9 +1314,10 @@ class App(tk.Tk):
             return
         for k, b in self.prof_buttons.items():
             sel = (k == pid)
-            b.config(bg=PRIMARY if sel else "#eef1f6",
-                     fg="white" if sel else TEXT,
-                     activebackground=PRIMARY_HOVER if sel else "#dde3ec")
+            b.config(bg=PRIMARY if sel else "#eef0f7",
+                     fg="white" if sel else TEXT_MED,
+                     activebackground=PRIMARY_HOVER if sel else "#e2e6f0",
+                     activeforeground="white" if sel else TEXT_MED)
         self.prof_detail.config(text=f"已选: {p.name}  |  核心概念 {p.concept_count()} 个 · 符号 {len(p.symbol_mapping)} 个 · 易错点 {len(p.common_misconceptions)} 个")
 
     # ---------------- Vault ----------------
@@ -1116,7 +1335,16 @@ class App(tk.Tk):
 
     # ---------------- 模型 ----------------
     def refresh_main(self):
-        self.user_label.config(text=f"👤 {self.account.username}")
+        uname = self.account.username
+        self.user_label.config(text=uname)
+        # 头像圆: 主色底 + 用户名首字
+        try:
+            self._avatar.delete("all")
+            self._avatar.create_oval(1, 1, 25, 25, fill=PRIMARY, outline="")
+            self._avatar.create_text(13, 14, text=(uname[:1] or "U").upper(),
+                                     fill="white", font=("Microsoft YaHei UI", 10, "bold"))
+        except Exception:
+            pass
         models = self.account.get_models()
         names = [f"{m.get('name','?')} · {m.get('model','')}" for m in models]
         if names:
@@ -1401,52 +1629,48 @@ class App(tk.Tk):
     #  右侧底部: 对话修改(AI 强化笔记 & 知识库)
     # =================================================================
     def _build_chat_section(self, parent):
-        card = tk.Frame(parent, bg=SURFACE, highlightbackground=BORDER, highlightthickness=1)
-        card.pack(fill="x", pady=(0, 2))
-        inner = card
+        card = RoundedFrame(parent, radius=16)
+        card.pack(fill="x", pady=(0, 4))
+        inner = card.inner()
         inner.columnconfigure(0, weight=1)
-        tk.Label(inner, text="💬 STEP 4 · 对话修改（越用越准）",
-                 font=FONT_H2, bg=SURFACE).grid(row=0, column=0, sticky="w", padx=18, pady=(12, 4))
-        tk.Label(inner, text="对选中的笔记提修改意见，AI 就地修订并沉淀回你的专业知识库",
-                 bg=SURFACE, fg=TEXT_LIGHT, font=FONT_XS, anchor="w").grid(
-            row=1, column=0, sticky="w", padx=18)
+        head = self._step_head(inner, 4, "对话修改（越用越准）",
+                               "对笔记提修改意见，AI 就地修订并沉淀回知识库")
+        head.grid(row=0, column=0, sticky="w", padx=18, pady=(14, 6))
 
         # 目标选择
         trow = tk.Frame(inner, bg=SURFACE)
-        trow.grid(row=2, column=0, sticky="ew", padx=18, pady=(6, 4))
-        tk.Label(trow, text="对象:", bg=SURFACE, fg=TEXT_MED, font=FONT_S).pack(side="left")
+        trow.grid(row=2, column=0, sticky="ew", padx=18, pady=(4, 6))
+        tk.Label(trow, text="修改对象", bg=SURFACE, fg=TEXT_MED, font=FONT_S).pack(side="left")
         self.refine_concept_var = tk.StringVar(value="整体 / MOC")
         self.refine_target_dd = ttk.Combobox(trow, textvariable=self.refine_concept_var,
                                              state="readonly", font=FONT_S)
-        self.refine_target_dd.pack(side="left", fill="x", expand=True)
+        self.refine_target_dd.pack(side="left", fill="x", expand=True, padx=(8, 0))
         self.refine_target_dd.bind("<<ComboboxSelected>>", lambda e: self._sync_refine_target())
 
         # 对话历史(只读)
-        self.chat_text = tk.Text(inner, bg="#f8fafc", fg=TEXT, font=FONT_S,
-                                 relief="solid", bd=1, state="disabled", wrap="word",
+        self.chat_text = tk.Text(inner, bg=SURFACE_2, fg=TEXT, font=FONT_S,
+                                 relief="flat", bd=0, state="disabled", wrap="word",
                                  height=5, padx=10, pady=8, highlightthickness=1,
-                                 highlightbackground=BORDER)
-        self.chat_text.grid(row=3, column=0, sticky="ew", padx=18, pady=(4, 6))
-        self.chat_text.tag_config("me", foreground="#185fa5")
-        self.chat_text.tag_config("ai", foreground="#0F6E56")
-        self.chat_text.tag_config("sys", foreground="#A32D2D")
+                                 highlightbackground=BORDER, highlightcolor=PRIMARY)
+        self.chat_text.grid(row=3, column=0, sticky="ew", padx=18, pady=(2, 8))
+        self.chat_text.tag_config("me", foreground=PRIMARY_HOVER)
+        self.chat_text.tag_config("ai", foreground="#0d9668")
+        self.chat_text.tag_config("sys", foreground="#c2410c")
 
         # 输入 + 按钮
         irow = tk.Frame(inner, bg=SURFACE)
-        irow.grid(row=4, column=0, sticky="ew", padx=18, pady=(0, 12))
+        irow.grid(row=4, column=0, sticky="ew", padx=18, pady=(0, 10))
         self.refine_entry = tk.Entry(irow, font=FONT_S, relief="solid", bd=1,
-                                     highlightbackground=BORDER, bg="white")
-        self.refine_entry.pack(side="left", fill="x", expand=True, ipady=3)
+                                     highlightbackground=BORDER, highlightcolor=PRIMARY, bg="white")
+        self.refine_entry.pack(side="left", fill="x", expand=True, ipady=4)
         self.refine_entry.bind("<Return>", lambda e: self._send_refine())
-        tk.Button(irow, text="发送修订", command=self._send_refine,
-                  bg=PRIMARY, fg="white", activebackground=PRIMARY_HOVER,
-                  relief="flat", cursor="hand2", font=FONT_S, bd=0).pack(side="left", padx=(6, 0))
-        tk.Button(irow, text="应用到笔记 + 沉淀", command=self._apply_refine,
-                  bg=SUCCESS, fg="white", activebackground="#047857",
-                  relief="flat", cursor="hand2", font=FONT_S, bd=0).pack(side="left", padx=(6, 0))
+        mkbtn(irow, "发送修订", self._send_refine, "primary",
+              FONT_S, padx=12, pady=4).pack(side="left", padx=(6, 0))
+        mkbtn(irow, "应用到笔记 + 沉淀", self._apply_refine, "success",
+              FONT_S, padx=12, pady=4).pack(side="left", padx=(6, 0))
         self.refine_hint = tk.Label(inner, text="提示: 先生成一次笔记, 即可针对某概念让 AI 修改并让知识库记住",
                                     bg=SURFACE, fg=TEXT_LIGHT, font=FONT_XS, anchor="w")
-        self.refine_hint.grid(row=5, column=0, sticky="w", padx=18, pady=(0, 12))
+        self.refine_hint.grid(row=5, column=0, sticky="w", padx=20, pady=(0, 14))
         self.refine_send_btn = None
         # 记录最近修订内容(供"应用")
         self._pending_revised = ""
@@ -1750,9 +1974,9 @@ class ModelDialog(tk.Toplevel):
         self._row(form, "模型名", self.model_v)
         act = tk.Frame(self, bg=BG)
         act.pack(fill="x", padx=16, pady=10)
-        tk.Button(act, text="添加", command=self._add, bg=PRIMARY, fg="white", relief="flat", cursor="hand2", bd=0).pack(side="left", padx=3)
-        tk.Button(act, text="更新选中", command=self._update, bg="#eef1f6", fg=TEXT, relief="flat", cursor="hand2", bd=0).pack(side="left", padx=3)
-        tk.Button(act, text="删除选中", command=self._delete, bg="#eef1f6", fg=DANGER, relief="flat", cursor="hand2", bd=0).pack(side="left", padx=3)
+        mkbtn(act, "＋ 添加", self._add, "primary", FONT_S, padx=14, pady=4).pack(side="left", padx=3)
+        mkbtn(act, "更新选中", self._update, "ghost", FONT_S, padx=12, pady=4).pack(side="left", padx=3)
+        mkbtn(act, "删除选中", self._delete, "danger", FONT_S, padx=12, pady=4).pack(side="left", padx=3)
         self._note = tk.Label(self, text="", bg=BG, fg=SUCCESS, font=FONT_S)
         self._note.pack(anchor="w", padx=16)
 
