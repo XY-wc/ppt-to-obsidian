@@ -540,15 +540,16 @@ def build_lecture_files(bundle: LectureBundle, course_dir: str, source_path: str
             parts.append(f"→ 下一节：[[{nxt_.stem}|{nxt_.num} {nxt_.title}]]")
         nav = ("\n\n---\n\n" + "　".join(parts)) if parts else ""
         title_line = f"{s.num} {s.title}" if s.num else s.title
-        head = _frontmatter(title_line, bundle.source_file, [])
+        head = _frontmatter(title_line, bundle.source_file, ["层级/正文"])
         fp = os.path.join(out_dir, f"{s.stem}.md")
         with open(fp, "w", encoding="utf-8") as f:
             f.write(head + s.body.rstrip() + "\n" + nav + "\n")
         written.append(fp)
 
     # ---- 3. index ----
+    # frontmatter 里的 层级/* tag 供 Obsidian 关系图按层级上色(见 obsidian/graph_config.py)
     idx = ["---", f'title: "{bundle.title}"', "type: knowledge",
-           f'source: "{bundle.source_file}"', "tags:", "  - 课程", "---", "",
+           f'source: "{bundle.source_file}"', "tags:", "  - 课程", "  - 层级/目录", "---", "",
            f"# 📗 {bundle.title}", "",
            f"> 由《{bundle.source_file}》自动整理 · 本页为章目录，点击跳转各节笔记", "", "## 目录", ""]
     for s in sections:

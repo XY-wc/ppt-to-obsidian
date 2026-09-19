@@ -29,6 +29,7 @@ from obsidian import vault_aware as va
 from obsidian import kb_calibration as kbc
 from obsidian.validator import validate_bundle, ValidationResult
 from obsidian import lecture as lec
+from obsidian import graph_config
 from llm.client import LLMClient, build_llm
 from core.app_config import Account, AppPaths
 
@@ -203,6 +204,8 @@ def run_conversion(
                     os.makedirs(vault_dir, exist_ok=True)
                     written = lec.build_lecture_files(lb, vault_dir, ppt_path, progress=log)
                     res.written_files = written
+                    # 生成后自动配置 Obsidian 关系图配色(按 目录/正文/附录/附件 层级上色)
+                    graph_config.apply_graph_colors(vault_dir, progress=log)
                     # 供 GUI 列表/计数: 仅 .md 作为 notes
                     md_notes = []
                     for w in written:
@@ -287,6 +290,8 @@ def run_conversion(
             log(f"🆕 将新建 {len(report.created)} 个全新概念笔记")
 
         written = va.apply_merge(report, log=log)
+        # 生成后自动配置 Obsidian 关系图配色(按 目录/概念/附录 层级上色)
+        graph_config.apply_graph_colors(vault_dir, progress=log)
 
         # 5c) 知识质量报告落盘(与概念同课夹, 不进 merge)
         try:

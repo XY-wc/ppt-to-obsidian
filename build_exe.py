@@ -83,6 +83,7 @@ def build():
         "--hidden-import", "obsidian.summarizer",
         "--hidden-import", "obsidian.staged",
         "--hidden-import", "obsidian.lecture",
+        "--hidden-import", "obsidian.graph_config",
         "--hidden-import", "obsidian.validator",
         "--hidden-import", "obsidian.note_template",
         "--hidden-import", "pipeline",

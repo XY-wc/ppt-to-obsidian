@@ -57,7 +57,8 @@ def build_moc_note(
     tags_extra: List[str] = None,
 ) -> str:
     """构建 MOC 首页 markdown。sections: 结构化章节。"""
-    tags = [professional, "MOC"] + (tags_extra or [])
+    # "层级/目录" 供 Obsidian 关系图按层级上色(见 obsidian/graph_config.py)
+    tags = [professional, "MOC", "层级/目录"] + (tags_extra or [])
     body = [build_frontmatter(moc_title, tags, professional, source_file, source_pages)]
     body.append("")
     body.append(f"> [!abstract] {professional} | 由《{source_file}》自动整理")
@@ -113,7 +114,8 @@ def build_atomic_note(
     evidence: List[str] = None,      # 支撑定义的 PPT 原文句
 ) -> str:
     """构建一张原子概念笔记。"""
-    all_tags = [professional] + (tags or [])
+    # "层级/概念" 供 Obsidian 关系图按层级上色(见 obsidian/graph_config.py)
+    all_tags = [professional, "层级/概念"] + (tags or [])
     extra = {}
     if ctype:
         extra["knowledge_type"] = '"%s"' % ctype
@@ -164,7 +166,8 @@ def build_misconception_note(
     misconceptions: List[Dict],
 ) -> str:
     """构建易错点卡片(汇总本PPT命中的易错点)。"""
-    tags = [professional, "易错点"]
+    # "层级/附录" 供 Obsidian 关系图按层级上色(见 obsidian/graph_config.py)
+    tags = [professional, "易错点", "层级/附录"]
     body = [build_frontmatter(title, tags, professional, source_file)]
     body.append("")
     body.append(f"# ⚠️ 易错点 | {professional}")

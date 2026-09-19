@@ -104,7 +104,7 @@ class ValidationResult:
         L.append("---")
         L.append(f'title: "知识质量报告"')
         L.append(f'source: "{self.source_file}"')
-        L.append("tags: [质量报告]")
+        L.append("tags: [质量报告, 层级/附录]")
         L.append("---")
         L.append("")
         L.append("# 📊 知识质量报告")
