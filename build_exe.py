@@ -39,12 +39,17 @@ def build():
     由于 sandbox 对大目录的 shutil.rmtree 受限 (SAFE_DELETE_BULK_CONFIRM_REQUIRED),
     使用临时输出目录, 打包完后再让调用方决定如何迁移到 dist/。
     """
-    pyi = os.path.join(os.path.dirname(sys.executable), "Scripts", "pyinstaller.exe")
-    if not os.path.exists(pyi):
-        # 尝试直接用模块
+    pyi = None
+    # 优先当前解释器同环境的 pyinstaller（venv）
+    for cand in [
+        os.path.join(os.path.dirname(sys.executable), "Scripts", "pyinstaller.exe"),
+        os.path.join(os.path.dirname(sys.executable), "pyinstaller.exe"),
+    ]:
+        if os.path.exists(cand):
+            pyi = [cand]
+            break
+    if not pyi:
         pyi = [sys.executable, "-m", "PyInstaller"]
-    else:
-        pyi = [pyi]
 
     # 数据文件: professions/*.json -> 打包后 professions/
     data_args = []
@@ -96,8 +101,35 @@ def build():
     if result.returncode != 0:
         print("PyInstaller 失败")
         sys.exit(1)
-    print(f"打包完成: {tmp_out}/{EXE_NAME}/")
-    print("提示: 最终产物在 _dist_tmp/PPT2Obsidian/，请手动覆盖 dist/ 或自行打包成安装包。")
+    src_app = os.path.join(tmp_out, EXE_NAME)
+    dst_app = os.path.join(DIST_DIR, EXE_NAME)
+    if os.path.isdir(dst_app):
+        try:
+            shutil.rmtree(dst_app)
+        except Exception as e:
+            print("清理旧 dist 失败:", e)
+    os.makedirs(DIST_DIR, exist_ok=True)
+    try:
+        shutil.copytree(src_app, dst_app)
+    except Exception as e:
+        print("复制到 dist 失败:", e)
+        print(f"产物仍在: {src_app}")
+        sys.exit(1)
+    # 写一份给接收方的简短说明
+    readme = os.path.join(dst_app, "使用说明.txt")
+    try:
+        with open(readme, "w", encoding="utf-8") as f:
+            f.write(
+                "【PPT → Obsidian 智能笔记】\n"
+                "1. 解压整个文件夹后，双击 PPT2Obsidian.exe 即可运行（不要只拷贝 exe）。\n"
+                "2. 首次使用请注册本地账号；数据保存在本机用户目录 .ppt2obsidian。\n"
+                "3. 建议先「设置知识库根目录」再新建课程，然后拖入 PPT/PDF 生成笔记。\n"
+                "4. 未绑定大模型也可离线生成；绑定 API 后结构更准。\n"
+            )
+    except Exception:
+        pass
+    print(f"打包完成: {dst_app}")
+    print(f"可执行文件: {os.path.join(dst_app, EXE_NAME + '.exe')}")
 
 
 def create_desktop_shortcut():
