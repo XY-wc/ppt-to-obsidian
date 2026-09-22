@@ -15,7 +15,7 @@
 """
 import re
 from dataclasses import dataclass, field
-from typing import List, Dict, Optional
+from typing import List, Dict
 
 from obsidian.summarizer import NoteBundle, Section, ConceptCard
 
@@ -47,6 +47,10 @@ def _parse_range(s: str) -> List[int]:
     return sorted(out)
 
 
+_PAREN_RE = re.compile(r"[（(]([^（）()]*)[）)]")
+_SEP_RE = re.compile(r"[、，,；;]")
+
+
 def _split_link_target(name: str) -> List[str]:
     """链接目标可能是复习页的"复述串"(如 '急性实验、在体实验、离体实验、慢性实验'
     或 '实验方法分类（急性、在体、离体、慢性）')。把列表成员拆出来分别判定,
@@ -57,13 +61,13 @@ def _split_link_target(name: str) -> List[str]:
         return []
     cands = []
     # 去掉括号后的主体优先(本身可能是列表或单个概念)
-    body = re.sub(r"[（(][^（）()]*[）)]", "", name).strip()
-    body_parts = [p.strip() for p in re.split(r"[、，,；;]", body) if p.strip()]
+    body = _PAREN_RE.sub("", name).strip()
+    body_parts = [p.strip() for p in _SEP_RE.split(body) if p.strip()]
     body_items = body_parts if len(body_parts) > 1 else ([body] if body else [])
     cands += body_items
     # 括号内容按分隔符拆成成员
-    for inner in re.findall(r"[（(]([^（）()]*)[）)]", name):
-        parts = [p.strip() for p in re.split(r"[、，,；;]", inner) if p.strip()]
+    for inner in _PAREN_RE.findall(name):
+        parts = [p.strip() for p in _SEP_RE.split(inner) if p.strip()]
         for p in (parts if len(parts) > 1 else [inner.strip()]):
             if p and p not in cands:
                 cands.append(p)

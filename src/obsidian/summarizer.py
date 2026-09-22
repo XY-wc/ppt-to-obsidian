@@ -26,7 +26,7 @@ from dataclasses import dataclass, field
 from typing import List, Dict, Optional
 
 from core.knowledge_base import Profession
-from core.ppt_parser import PresentationDoc, Slide
+from core.ppt_parser import PresentationDoc
 
 
 # ---------------- 数据容器 ----------------
@@ -76,8 +76,11 @@ class NoteBundle:
 
 # ---------------- 本地符号还原 & 概念检测 ----------------
 
+_NORM_RE = re.compile(r"[\s\.]")
+
+
 def _norm(s):
-    return re.sub(r"[\s\.]", "", str(s)).lower() if s else ""
+    return _NORM_RE.sub("", str(s)).lower() if s else ""
 
 
 def detect_symbols_used(text: str, prof: Profession) -> List[Dict]:
@@ -210,13 +213,16 @@ USER_TMPL = """下面是你要处理的课件内容(来自 PPT《{filename}》)�
 
 # ---------------- JSON 解析(带容错) ----------------
 
+_JSON_FENCE_RE = re.compile(r"```(?:json)?\s*(.*?)```", re.S)
+
+
 def _extract_json(text: str) -> Optional[Dict]:
     """从 LLM 输出中稳健提取 JSON 对象。"""
     if not text:
         return None
     # 去掉可能的 ```json ``` 围栏
     text = text.strip()
-    fence = re.search(r"```(?:json)?\s*(.*?)```", text, re.S)
+    fence = _JSON_FENCE_RE.search(text)
     if fence:
         text = fence.group(1).strip()
     # 定位第一个 { 到最后一个 }
@@ -233,17 +239,20 @@ def _extract_json(text: str) -> Optional[Dict]:
     return None
 
 
+_TRAILING_COMMA_RE = re.compile(r",\s*([}\]])")
+
+
 def _json_candidates(cand: str):
     """产出多个可尝试解析的候选串, 逐步放宽对引号内原始换行的容忍。"""
     yield cand  # 原样
     # 去掉结尾多余逗号
-    yield re.sub(r",\s*([}\]])", r"\1", cand)
+    yield _TRAILING_COMMA_RE.sub(r"\1", cand)
     # 把字符串值内部真正的换行符转义为 \\n (LLM 偶尔不转义)
     fixed = re.sub(r'("(?:\\.|[^"\\])*?):\s*"((?:\\.|[^"\\\n])*?)(\n+)((?:\\.|[^"\\])*?)"',
                    lambda m: m.group(1) + ': "' + m.group(2) + '\\n' + m.group(4) + '"',
                    cand)
     yield fixed
-    yield re.sub(r",\s*([}\]])", r"\1", fixed)
+    yield _TRAILING_COMMA_RE.sub(r"\1", fixed)
 
 
 # ---------------- 本地兜底(离线生成基础笔记) ----------------

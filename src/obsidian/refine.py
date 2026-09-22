@@ -50,6 +50,10 @@ REVISE_SYSTEM_TMPL = """你是一位严谨的{prof_name}笔记整理助手。用
 """
 
 
+_DIGIT_RE = re.compile(r"\d+")
+_MD_FENCE_RE = re.compile(r"```(?:markdown|md)?\s*(.*?)```", re.S)
+
+
 def _slice_ppt_around(pages_hint: str, ppt_text: str, radius: int = 400) -> str:
     """从整份 PPT 全文里取与 source_pages 相关的一段, 控制 token 避免塞整份。"""
     if not ppt_text:
@@ -58,7 +62,7 @@ def _slice_ppt_around(pages_hint: str, ppt_text: str, radius: int = 400) -> str:
     if not pages_hint:
         return ppt_text[:2000]
     # 简单策略: 定位第一个命中页码的分块附近
-    m = re.search(r"\d+", str(pages_hint))
+    m = _DIGIT_RE.search(str(pages_hint))
     if not m:
         return ppt_text[:2000]
     target = int(m.group())
@@ -115,7 +119,7 @@ def revise_note_text(*, llm, concept_or_target: str, current_md: str,
         out = llm.chat(msgs, max_tokens=4096)
         revised = (out or "").strip()
         # 去掉可能的 ```markdown 围栏
-        fence = re.search(r"```(?:markdown|md)?\s*(.*?)```", revised, re.S)
+        fence = _MD_FENCE_RE.search(revised)
         if fence:
             revised = fence.group(1).strip()
         if not revised:
@@ -165,20 +169,9 @@ def extract_delta(*, llm, target: str, original_md: str, revised_md: str,
 
 
 def _parse_json(text: str) -> Optional[Dict]:
-    if not text:
-        return None
-    text = text.strip()
-    fence = re.search(r"```(?:json)?\s*(.*?)```", text, re.S)
-    if fence:
-        text = fence.group(1).strip()
-    s, e = text.find("{"), text.rfind("}")
-    if s == -1 or e == -1 or e <= s:
-        return None
-    cand = text[s:e + 1]
-    try:
-        return json.loads(cand)
-    except Exception:
-        return None
+    """从模型输出提取 JSON（统一走 summarizer 的容错解析）。"""
+    from obsidian.summarizer import _extract_json
+    return _extract_json(text)
 
 
 # ---------------- 校准入口 ----------------

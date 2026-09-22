@@ -24,9 +24,12 @@ from datetime import datetime
 from typing import List, Dict, Optional
 
 
+_SLUG_BAD = re.compile(r'[\\/:*?"<>|\r\n]+')
+
+
 def slugify(name: str) -> str:
     """文件名安全化: 中文保留, 去掉非法字符。"""
-    s = re.sub(r'[\\/:*?"<>|\r\n]+', "_", str(name)).strip()
+    s = _SLUG_BAD.sub("_", str(name)).strip()
     return s[:80] or "note"
 
 

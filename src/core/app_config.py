@@ -50,7 +50,7 @@ def _load_json(path: str, default):
     try:
         with open(path, "r", encoding="utf-8") as f:
             return json.load(f)
-    except Exception:
+    except (OSError, json.JSONDecodeError, TypeError, ValueError):
         return default
 
 
@@ -60,7 +60,7 @@ def _save_json(path: str, data) -> bool:
         with open(path, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
         return True
-    except Exception:
+    except OSError:
         return False
 
 

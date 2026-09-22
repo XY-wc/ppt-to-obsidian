@@ -13,7 +13,7 @@ import os
 import sys
 import traceback
 from dataclasses import dataclass, field
-from typing import List, Optional, Callable
+from typing import List, Optional, Callable  # noqa: F401  (Optional/Callable 用于注解)
 
 # 保证可被当脚本运行
 _HERE = os.path.dirname(os.path.abspath(__file__))
@@ -31,7 +31,7 @@ from obsidian.validator import validate_bundle, ValidationResult
 from obsidian import lecture as lec
 from obsidian import graph_config
 from llm.client import LLMClient, build_llm
-from core.app_config import Account, AppPaths
+from core.app_config import Account
 
 
 @dataclass
@@ -270,8 +270,8 @@ def run_conversion(
                                           candidate_terms=llm_candidates)
                     log(f"🧠 自学沉淀 {len(llm_candidates)} 个新概念到「{prof.name}」补充库")
                 store.confirm_tally([c.concept for c in bundle.concepts])
-            except Exception:
-                pass
+            except Exception as e:
+                log(f"(自学沉淀跳过: {e})")
 
         # 6) Vault 感知落盘: 去重 / 合并 / 补双链
         if not vault_dir:

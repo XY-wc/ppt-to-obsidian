@@ -9,7 +9,6 @@
     保证低依赖也能跑。
   - chat() 返回纯文本; 便于上层把"专业知识注入 prompt"后调用。
 """
-from dataclasses import dataclass
 from typing import List, Dict, Optional, Generator
 
 # 常见厂商速选(供界面下拉, 未列出的可填自定义 base_url)
@@ -32,12 +31,6 @@ KNOWN_PROVIDERS = [
     {"label": "Ollama(本地)", "base_url": "http://localhost:11434/v1", "model": "qwen2.5:7b"},
     {"label": "自定义", "base_url": "", "model": ""},
 ]
-
-
-@dataclass
-class ChatMessage:
-    role: str   # 'system' | 'user' | 'assistant'
-    content: str
 
 
 class LLMError(RuntimeError):

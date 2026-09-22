@@ -14,7 +14,6 @@
       build_lecture_files(bundle, course_dir, source_path) -> 写入 index+各节+attachments
 """
 import os
-import os
 import re
 from dataclasses import dataclass, field
 from typing import List, Dict, Optional, Callable
@@ -144,9 +143,11 @@ LECT_SECTION_USER = """===本节标题===
 
 
 # 统一占位格式: 支持"【课件截图：第N页】"与旧 HTML 注释; 归一为 <!--截图:N-->
+_SHOT_CN_RE = re.compile(r"【\s*(?:课件)?截图\s*[:：]?\s*(?:第\s*|p\s*)?(\d{1,4})\s*页?\s*】")
+
+
 def _normalize_shots(body: str) -> str:
-    return re.sub(r"【\s*(?:课件)?截图\s*[:：]?\s*(?:第\s*|p\s*)?(\d{1,4})\s*页?\s*】",
-                  r"<!--截图:\1-->", body or "")
+    return _SHOT_CN_RE.sub(r"<!--截图:\1-->", body or "")
 
 
 # 例题/原题页线索(文字重建困难, 适合放原页截图)
@@ -179,10 +180,13 @@ def _clean_page_noise(txt: str) -> str:
 
 # ---------------- 工具 ----------------
 
+_NUM_TITLE_RE = re.compile(r"^(\d+(?:\.\d+)?)\s*[、.\s]*(.*)$")
+
+
 def _num_title(heading: str):
     """'1.1 热力学概论' -> ('1.1', '热力学概论'); '复习与习题' -> (None, '复习与习题')"""
     h = str(heading).strip()
-    m = re.match(r"^(\d+(?:\.\d+)?)\s*[、.\s]*(.*)$", h)
+    m = _NUM_TITLE_RE.match(h)
     if m and m.group(2).strip():
         return m.group(1), m.group(2).strip()
     return None, h
@@ -227,8 +231,9 @@ def _reindex_sections(sections: List[dict]) -> List[dict]:
 
 
 def _slug(name: str) -> str:
-    s = re.sub(r'[\\/:*?"<>|\r\n]+', "_", str(name)).strip()
-    return s[:60] or "note"
+    """文件名安全化(统一走 note_template.slugify, 截断长度保持 60)。"""
+    from obsidian.note_template import slugify
+    return slugify(name)[:60] or "note"
 
 
 def _page_meta_lines(doc, indices: List[int]) -> str:
@@ -329,8 +334,11 @@ def _map_wikilinks(body: str, sections: List[dict]) -> str:
     return re.sub(r"\[\[([^\]\|]+)\]\]", _rep, body)
 
 
+_NORM_RE = re.compile(r"[\s\.\-_·/\\:：（）()]+")
+
+
 def _norm(s: str) -> str:
-    return re.sub(r"[\s\.\-_·/\\:：（）()]+", "", str(s)).lower() if s else ""
+    return _NORM_RE.sub("", str(s)).lower() if s else ""
 
 
 def summarize_lecture(doc: PresentationDoc, prof: Profession, llm,

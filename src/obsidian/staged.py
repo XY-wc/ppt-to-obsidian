@@ -22,7 +22,6 @@
 对外: summarize_staged(...) 返回与旧版一致的 NoteBundle(professional_name/sections/concepts/...),
 不改变落盘 / GUI / vault merge 层 —— 只是"怎么生成"更好。
 """
-import json
 import re
 from typing import List, Dict, Optional
 
@@ -65,6 +64,9 @@ def _per_slide_preview(doc: PresentationDoc, width: int = 110) -> List[Dict]:
     return out
 
 
+_RANGE_RE = re.compile(r"^\s*(\d+)\s*[-~至到]\s*(\d+)\s*$")
+
+
 def _range_to_indices(range_str: str, total: int) -> List[int]:
     """把 '3-9' / '3,5-9' / '3' 解析成页面 index 列表(1-based, 夹在 1..total)。"""
     indices = set()
@@ -74,7 +76,7 @@ def _range_to_indices(range_str: str, total: int) -> List[int]:
         part = part.strip()
         if not part:
             continue
-        m = re.match(r"^\s*(\d+)\s*[-~至到]\s*(\d+)\s*$", part)
+        m = _RANGE_RE.match(part)
         if m:
             a, b = int(m.group(1)), int(m.group(2))
             lo, hi = min(a, b), max(a, b)
@@ -424,6 +426,9 @@ def _drop_echo_combined_cards(cards: List[ConceptCard]) -> List[ConceptCard]:
     return kept
 
 
+_PAREN_RE = re.compile(r"[（(][^（）()]*[）)]")
+
+
 def _expand_linkish(name) -> List[str]:
     """把可能含"复述串"的链接目标展开为成员列表:
     括号内容按分隔符拆(急性、在体 -> 急性/在体), 括号主体若也是列表则拆, 单个概念原样。
@@ -433,11 +438,11 @@ def _expand_linkish(name) -> List[str]:
     if not name:
         return []
     cands = []
-    body = re.sub(r"[（(][^（）()]*[）)]", "", name).strip()
+    body = _PAREN_RE.sub("", name).strip()
     body_parts = [p.strip() for p in re.split(r"[、，,；;]", body) if p.strip()]
     body_items = body_parts if len(body_parts) > 1 else ([body] if body else [])
     cands += body_items
-    for inner in re.findall(r"[（(]([^（）()]*)[）)]", name):
+    for inner in _PAREN_RE.findall(name):
         parts = [p.strip() for p in re.split(r"[、，,；;]", inner) if p.strip()]
         for p in (parts if len(parts) > 1 else [inner.strip()]):
             if p and p not in cands:

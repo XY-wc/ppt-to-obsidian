@@ -91,7 +91,7 @@ class CalibrationStore:
             if os.path.isfile(self.file):
                 with open(self.file, "r", encoding="utf-8") as f:
                     return json.load(f)
-        except Exception:
+        except (OSError, json.JSONDecodeError, TypeError, ValueError):
             pass
         return {"extra_concepts": [], "extra_symbols": [], "extra_misconceptions": []}
 

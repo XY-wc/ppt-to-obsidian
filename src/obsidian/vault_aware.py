@@ -45,7 +45,8 @@ def _strip_ext(fn: str) -> str:
 
 def nt_slug(name: str) -> str:
     """本地安全文件名(与 note_template.slugify 保持一致, 避免跨模块耦合)。"""
-    return re.sub(r'[\\/:*?"<>|\r\n]+', "_", str(name)).strip()[:80] or "note"
+    from obsidian.note_template import slugify
+    return slugify(name)
 
 
 def _frontmatter_field(text: str, key: str) -> str:
@@ -54,7 +55,7 @@ def _frontmatter_field(text: str, key: str) -> str:
         return ""
     end = text.find("\n---", 3)
     block = text[3: end if end != -1 else len(text)]
-    pat = re.compile(rf"^\s*{re.escape(key)}\s*:\s*(.+)$", re.M)
+    pat = re.compile(_FRONTMATTER_RE_TMPL.format(re.escape(key)), re.M)
     m = pat.search(block)
     if not m:
         return ""
@@ -256,7 +257,7 @@ def plan_merge(index: VaultIndex, notes, professional_name: str, vault_dir: str,
 
 def _extract_definition(content: str) -> str:
     """从渲染好的原子笔记里抠出"定义" quote 块的内容。"""
-    m = re.search(r"> \[!quote\] 定义\s*\n> (.*?)(?:\n>\s*\n|\n> \[!info\]|\n## |\Z)", content, re.S)
+    m = _QUOTE_DEF_RE.search(content)
     if not m:
         return ""
     return m.group(1).strip()
@@ -264,7 +265,7 @@ def _extract_definition(content: str) -> str:
 
 def _extract_detail(content: str) -> str:
     """从渲染好的原子笔记里抠出 '## 📝 详细说明' 段的内容。"""
-    m = re.search(r"## 📝 详细说明\s*\n(.*?)(?:\n## |\n## 来源|\Z)", content, re.S)
+    m = _DETAIL_RE.search(content)
     if not m:
         return ""
     return m.group(1).strip()
@@ -287,7 +288,7 @@ def _build_merge_addendum(concept_note, professional_name: str, existing_content
     blocks = []
     loc = ""
     # 来源文件: 从 content 尾部的 "PPT: 《xxx》" 提取
-    m_src = re.search(r"PPT:\s*《([^》]*)》", content)
+    m_src = _SRC_RE.search(content)
     if m_src:
         loc = m_src.group(1)
     if pages:
