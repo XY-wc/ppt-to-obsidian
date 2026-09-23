@@ -31,12 +31,21 @@ import re
 from dataclasses import dataclass, field
 from typing import List, Dict, Optional
 
+_NORM_RE = re.compile(r"[\s\.\-_·/\\:：（）()]+")
+_WIKI_RE = re.compile(r"\[\[([^\]]+)\]\]")
+_FRONTMATTER_RE_TMPL = r"^\s*{}\s*:\s*(.+)$"
+_QUOTE_DEF_RE = re.compile(
+    r"> \[!quote\] 定义\s*\n> (.*?)(?:\n>\s*\n|\n> \[!info\]|\n## |\Z)", re.S)
+_DETAIL_RE = re.compile(
+    r"## 📝 详细说明\s*\n(.*?)(?:\n## |\n## 来源|\Z)", re.S)
+_SRC_RE = re.compile(r"PPT:\s*《([^》]*)》")
+
 
 def _norm(s: str) -> str:
     """规范化用于匹配: 去空白/点/下划线/连字符, 小写。Obsidian 文件名常带这些分隔。"""
     if not s:
         return ""
-    return re.sub(r"[\s\.\-_·/\\:：（）()]+", "", str(s)).lower()
+    return _NORM_RE.sub("", str(s)).lower()
 
 
 def _strip_ext(fn: str) -> str:
@@ -68,7 +77,7 @@ def _frontmatter_field(text: str, key: str) -> str:
 
 def _wikilinks(text: str) -> List[str]:
     """提取所有 [[目标|别名]] 的目标名。"""
-    return [x.split("|")[0].split("#")[0].strip() for x in re.findall(r"\[\[([^\]]+)\]\]", text)]
+    return [x.split("|")[0].split("#")[0].strip() for x in _WIKI_RE.findall(text)]
 
 
 @dataclass

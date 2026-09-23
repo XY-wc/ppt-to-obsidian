@@ -69,7 +69,8 @@ def _load(path: str) -> Dict:
         if isinstance(data, dict):
             return data
     except Exception:
-        return dict(_SKELETON)
+        pass
+    return dict(_SKELETON)
 
 
 def _insert_before_fallback(kept: List[Dict], new_items: List[Dict]) -> List[Dict]:

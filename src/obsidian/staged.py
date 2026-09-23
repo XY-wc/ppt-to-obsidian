@@ -426,7 +426,8 @@ def _drop_echo_combined_cards(cards: List[ConceptCard]) -> List[ConceptCard]:
     return kept
 
 
-_PAREN_RE = re.compile(r"[（(][^（）()]*[）)]")
+# 带捕获组：sub 去掉整段括号，findall 取括号内文
+_PAREN_RE = re.compile(r"[（(]([^（）()]*)[）)]")
 
 
 def _expand_linkish(name) -> List[str]:
