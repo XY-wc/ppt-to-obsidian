@@ -5,6 +5,8 @@ __pycache__/
 *.egg-info/
 .venv/
 venv/
+# 打包专用虚拟环境(本地)
+.venv-build/
 
 # 测试与缓存
 .pytest_cache/
@@ -28,6 +30,15 @@ data/
 outputs/*.pptx
 outputs/*.pdf
 outputs/*.ppt
+# 本地界面预览截图(开发自测用)
+outputs/*.png
+
+# ★ 凭据安全: 本地账号 / 模型 API Key 一律不入库(即使被误建在仓库内也不能提交)
+.ppt2obsidian/
+**/.ppt2obsidian/
+*.key
+secrets.json
+.env
 
 # 开发期截图(可能含本地用户名/路径), 公开发布前需替换或脱敏
 docs/*.png

@@ -65,9 +65,16 @@ def _page_range_of_concept(concept) -> str:
     return concept.source_pages or ""
 
 
-def render_bundle(bundle: NoteBundle, professional_name: str, source_file: str) -> List[GeneratedNote]:
-    """把 NoteBundle 渲染成一组 Obsidian 笔记(纯内存, 未落盘)。"""
+def render_bundle(bundle: NoteBundle, professional_name: str, source_file: str,
+                  course_name: str = "") -> List[GeneratedNote]:
+    """把 NoteBundle 渲染成一组 Obsidian 笔记(纯内存, 未落盘)。
+
+    course_name 非空时, 每张笔记都会带上 ``课程/<课程名>`` 标签 —— 打开 Obsidian 关系图的
+    「显示标签」后, 同一门课的笔记会连到同一个标签枢纽上, 从而自动聚成一团。
+    """
     notes: List[GeneratedNote] = []
+    ctag = graph_config.course_tag(course_name) if course_name else ""
+    extra_tags = [ctag] if ctag else None
     # 1) MOC 首页
     moc_sections = []
     for sec in bundle.sections:
@@ -81,6 +88,7 @@ def render_bundle(bundle: NoteBundle, professional_name: str, source_file: str) 
         moc_title=moc_title, professional=professional_name,
         source_file=source_file, sections=moc_sections,
         misconceptions=bundle.misconceptions or None,
+        tags_extra=extra_tags,
     )
     notes.append(GeneratedNote(
         rel_path=f"{_safe_name(bundle.title)}/00_MOC.md",
@@ -119,7 +127,8 @@ def render_bundle(bundle: NoteBundle, professional_name: str, source_file: str) 
     if bundle.misconceptions:
         mis_md = nt.build_misconception_note(
             title=f"{bundle.title} · 易错点", professional=professional_name,
-            source_file=source_file, misconceptions=bundle.misconceptions)
+            source_file=source_file, misconceptions=bundle.misconceptions,
+            tags_extra=extra_tags)
         notes.append(GeneratedNote(
             rel_path=f"{_safe_name(bundle.title)}/{_safe_name(bundle.title)}_易错点.md",
             abs_path="", title=f"{bundle.title}·易错点", kind="misconception", content=mis_md))
@@ -136,13 +145,20 @@ def run_conversion(
     llm: Optional[LLMClient] = None,
     progress: Optional[Callable[[str], None]] = None,
     mode: str = "lecture",       # "lecture" 讲义式(默认) | "cards" 概念卡片式
+    vault_root: Optional[str] = None,   # Obsidian 仓库根(不给则从 vault_dir 向上探测)
+    graph_scheme: Optional[str] = None,  # 关系图配色: "course" 每课一色(默认) | "layer" 按层级
 ) -> ConversionResult:
     """执行一次完整转换并落盘到 vault_dir。
 
-    mode=lecture: 输出 index + 按课件小节分文件的结构化讲义(默认, 信息不碎、像人整理)。
+    mode=lecture: 输出 目录 + 按课件小节分文件的结构化讲义(默认, 信息不碎、像人整理)。
     mode=cards:   旧版 原子概念卡 + MOC(适合想建概念图谱)。
+
+    vault_dir 通常是「课程子夹」(一科一夹); 生成后会自动刷新该课程的「课程总目录」,
+    让同一门课的多个课件在 Obsidian 关系图里聚成一团, 并把配色写到真正的仓库根。
     """
     res = ConversionResult(vault_dir=vault_dir, bundle=None)
+    # 课程名 = 输出目录名(vault_dir 是「课程子夹」); 用于给笔记打「课程/xxx」标签
+    course_name = os.path.basename(os.path.normpath(os.path.abspath(vault_dir))) if vault_dir else ""
     def log(m):
         if progress: progress(m)
     try:
@@ -202,10 +218,15 @@ def run_conversion(
                     if not vault_dir:
                         raise ValueError("未指定 Obsidian vault 输出目录")
                     os.makedirs(vault_dir, exist_ok=True)
-                    written = lec.build_lecture_files(lb, vault_dir, ppt_path, progress=log)
+                    written = lec.build_lecture_files(lb, vault_dir, ppt_path,
+                                                      progress=log, vault_root=vault_root)
+                    # 刷新「课程总目录」: 把同课各课件串成一团(关系图按课程聚簇)
+                    hub = lec.build_course_index(vault_dir, progress=log, vault_root=vault_root)
+                    if hub:
+                        written.append(hub)
                     res.written_files = written
-                    # 生成后自动配置 Obsidian 关系图配色(按 目录/正文/附录/附件 层级上色)
-                    graph_config.apply_graph_colors(vault_dir, progress=log)
+                    # 生成后自动配置 Obsidian 关系图配色(写到仓库根, 按 课程/目录/正文/附录/附件 上色)
+                    graph_config.apply_graph_colors(vault_dir, progress=log, vault_root=vault_root)
                     # 供 GUI 列表/计数: 仅 .md 作为 notes
                     md_notes = []
                     for w in written:
@@ -240,7 +261,7 @@ def run_conversion(
                            extra_concept_names=extra_names)
 
         # 5) 渲染
-        notes = render_bundle(bundle, prof.name, os.path.basename(ppt_path))
+        notes = render_bundle(bundle, prof.name, os.path.basename(ppt_path), course_name=course_name)
         res.notes = notes
         res.bundle = bundle
 
@@ -290,8 +311,12 @@ def run_conversion(
             log(f"🆕 将新建 {len(report.created)} 个全新概念笔记")
 
         written = va.apply_merge(report, log=log)
-        # 生成后自动配置 Obsidian 关系图配色(按 目录/概念/附录 层级上色)
-        graph_config.apply_graph_colors(vault_dir, progress=log)
+        # 刷新「课程总目录」(概念卡模式同样按课程聚簇)
+        hub = lec.build_course_index(vault_dir, progress=log, vault_root=vault_root)
+        if hub:
+            written = list(written) + [hub]
+        # 生成后自动配置 Obsidian 关系图配色(写到仓库根, 按 课程/目录/概念/附录 上色)
+        graph_config.apply_graph_colors(vault_dir, progress=log, vault_root=vault_root)
 
         # 5c) 知识质量报告落盘(与概念同课夹, 不进 merge)
         try:

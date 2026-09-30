@@ -167,10 +167,11 @@ def build_atomic_note(
 def build_misconception_note(
     title: str, professional: str, source_file: str,
     misconceptions: List[Dict],
+    tags_extra: List[str] = None,
 ) -> str:
     """构建易错点卡片(汇总本PPT命中的易错点)。"""
     # "层级/附录" 供 Obsidian 关系图按层级上色(见 obsidian/graph_config.py)
-    tags = [professional, "易错点", "层级/附录"]
+    tags = [professional, "易错点", "层级/附录"] + (tags_extra or [])
     body = [build_frontmatter(title, tags, professional, source_file)]
     body.append("")
     body.append(f"# ⚠️ 易错点 | {professional}")

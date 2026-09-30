@@ -21,6 +21,21 @@ if _SRC not in sys.path:
 
 import tkinter as tk
 
+# 拖拽上传：tkinterdnd2 封装了 tkdnd 扩展(内含各平台动态库)。
+# 未安装时自动降级为「点击选择文件」，其余功能不受影响。
+try:
+    from tkinterdnd2 import (TkinterDnD as _TkinterDnD,
+                             DND_FILES as _DND_FILES,
+                             COPY as _DND_COPY,
+                             NONE as _DND_NONE)
+    HAS_DND = True
+except Exception:  # pragma: no cover - 缺少依赖时降级
+    _TkinterDnD = None
+    _DND_FILES = ""
+    _DND_COPY = "copy"
+    _DND_NONE = "none"
+    HAS_DND = False
+
 from core.app_config import AccountManager, AppPaths
 from core.knowledge_base import KnowledgeBase
 from core.document_loader import is_supported as _doc_supported
@@ -285,6 +300,8 @@ class App(tk.Tk):
         self.configure(bg=BG)
         self._setup_app_icon()
         self._setup_style()
+        # 在 Tk root 上加载 tkdnd 扩展(拖拽上传所需); 失败则禁用拖拽
+        self._dnd_ready = self._enable_dnd()
 
         self.paths = AppPaths()
         self.mgr = AccountManager(self.paths)
@@ -308,6 +325,8 @@ class App(tk.Tk):
         self._pending_revised = ""
         self._running = False
         self._ready_vars = {}
+        self._scroll_canvases = []
+        self._wheel_global_bound = False
 
         self._setup_menu()
         self.container = tk.Frame(self, bg=BG)
@@ -491,13 +510,62 @@ class App(tk.Tk):
             pass
 
     def _bind_mousewheel(self, canvas, *widgets):
-        def _wheel(e, c=canvas):
+        """让右侧工作区在指针悬停的任意空白处都能滚轮翻页。
+
+        Windows 滚轮发给「焦点控件」而不是指针下控件，所以要用 bind_all
+        全局接管，并按 *当前指针位置* 判断是否落在某个滚动画布内。
+        """
+        if canvas not in self._scroll_canvases:
+            self._scroll_canvases.append(canvas)
+
+        def _scroll_y(c, delta):
             try:
-                c.yview_scroll(int(-1 * (e.delta / 120)), "units")
+                units = int(-1 * (delta / 120))
+                if units == 0 and delta:
+                    units = -1 if delta > 0 else 1
+                if units:
+                    c.yview_scroll(units, "units")
             except Exception:
                 pass
+
+        def _in_canvas(c, x, y):
+            try:
+                if not c.winfo_ismapped():
+                    return False
+                cx, cy = c.winfo_rootx(), c.winfo_rooty()
+                cw, ch = c.winfo_width(), c.winfo_height()
+                return cx <= x < cx + cw and cy <= y < cy + ch
+            except Exception:
+                return False
+
+        def _wheel(e, c=canvas):
+            _scroll_y(c, e.delta)
+            return "break"
+
+        def _wheel_global(e):
+            # 用指针实时坐标，不依赖 e.x_root（焦点不在画布时经常不可靠）
+            try:
+                x, y = self.winfo_pointerx(), self.winfo_pointery()
+            except Exception:
+                return
+            for c in list(self._scroll_canvases):
+                if _in_canvas(c, x, y):
+                    _scroll_y(c, e.delta)
+                    return "break"
+
+        def _bind_tree(w):
+            # 去重：Configure 会反复进来
+            if not getattr(w, "_wheel_bound", False):
+                w.bind("<MouseWheel>", _wheel)
+                w._wheel_bound = True
+            for ch in w.winfo_children():
+                _bind_tree(ch)
+
         for w in widgets:
-            w.bind("<MouseWheel>", _wheel)
+            _bind_tree(w)
+        if not getattr(self, "_wheel_global_bound", False):
+            self.bind_all("<MouseWheel>", _wheel_global, add="+")
+            self._wheel_global_bound = True
 
     def _make_scroll_area(self, parent, bg=BG):
         wrap = tk.Frame(parent, bg=bg)
@@ -511,12 +579,27 @@ class App(tk.Tk):
 
         def _on_cfg(e):
             canvas.configure(scrollregion=canvas.bbox("all"))
-            canvas.itemconfigure(win_id, width=e.width)
+            canvas.itemconfigure(win_id, width=max(1, canvas.winfo_width()))
+            self._sync_scroll_fill(canvas, inner, e)
+            self._bind_mousewheel(canvas, wrap, canvas, inner)
 
         inner.bind("<Configure>", _on_cfg)
         canvas.bind("<Configure>", _on_cfg)
-        self._bind_mousewheel(canvas, canvas, inner)
+        self._bind_mousewheel(canvas, wrap, canvas, inner)
         return wrap, canvas, inner
+
+    def _sync_scroll_fill(self, canvas, inner, event=None):
+        """内容矮于可视区时拉伸 inner，空白区也落在可滚动控件上。"""
+        try:
+            cw = max(1, canvas.winfo_width())
+            ch = max(1, canvas.winfo_height())
+            h = max(ch, inner.winfo_reqheight())
+            for wid in canvas.find_withtag("all"):
+                if canvas.type(wid) == "window":
+                    canvas.itemconfigure(wid, width=cw, height=h)
+                    break
+        except Exception:
+            pass
 
     # ───────────────────────── 登录页 ─────────────────────────
     def _build_login(self, parent):
@@ -628,6 +711,8 @@ class App(tk.Tk):
         self._build_sidebar(mid)
         self._build_workspace(mid)
         self._build_statusbar(page)
+        # 整个主界面都可接收拖入的课件（拖到任意空白处也能选文件）
+        self._setup_dnd(page)
         return page
 
     def _build_header(self, parent):
@@ -902,7 +987,9 @@ class App(tk.Tk):
             self.course_browse_hint.config(text=f"「{self._active_course}」还没有笔记，生成后自动出现", fg=TEXT_LIGHT)
         else:
             for d in dirs:
-                did = tree.insert("", "end", text=d, tags=("dir",), open=False)
+                dpath = os.path.join(base, d)
+                did = tree.insert("", "end", text=d, tags=("dir",), open=False,
+                                  values=(dpath,))
                 try:
                     for sub in sorted(os.listdir(os.path.join(base, d))):
                         if sub.startswith("."):
@@ -928,27 +1015,51 @@ class App(tk.Tk):
         sel = tree.selection()
         if not sel:
             return ""
-        vals = tree.item(sel[0], "values")
-        return vals[0] if vals else ""
+        return self._tree_row_path(tree, sel[0])
+
+    @staticmethod
+    def _tree_row_path(tree, row):
+        """取行对应磁盘路径：优先 values；目录若未写入 values 则用 text 回退。"""
+        if not row:
+            return ""
+        vals = tree.item(row, "values")
+        path = vals[0] if vals else ""
+        if path:
+            return path
+        tags = tree.item(row, "tags") or ()
+        if "dir" in tags:
+            parent = tree.parent(row)
+            pvals = tree.item(parent, "values") if parent else ""
+            base = pvals[0] if pvals else ""
+            name = tree.item(row, "text") or ""
+            if base and name:
+                return os.path.join(base, name)
+        return ""
+
+    @staticmethod
+    def _is_dir_row(tree, row):
+        tags = tree.item(row, "tags") or ()
+        if "dir" in tags:
+            return True
+        path = App._tree_row_path(tree, row)
+        return bool(path) and os.path.isdir(path)
 
     def _on_tree_click(self, event):
-        """单击笔记夹：直接展开/收起，不用点前面的三角。"""
+        """单击笔记夹：选中并展开（不在此收起，避免双击时被二次切换打断）。"""
         tree = getattr(self, "course_tree", None)
         if tree is None:
             return
         row = tree.identify_row(event.y)
         if not row:
             return
+        tree.selection_set(row)
         tags = tree.item(row, "tags") or ()
-        if "dir" in tags and tree.get_children(row):
-            if tree.item(row, "open"):
-                tree.item(row, open=False)
-            else:
-                tree.item(row, open=True)
+        if "dir" in tags and tree.get_children(row) and not tree.item(row, "open"):
+            tree.item(row, open=True)
             return "break"
 
     def _on_tree_open(self, event=None):
-        """双击：笔记夹展开/收起；笔记用 Obsidian 打开。"""
+        """双击：笔记夹展开/收起；笔记用 Obsidian 打开。不弹「请先选中」对话框。"""
         tree = getattr(self, "course_tree", None)
         if tree is None:
             return
@@ -962,32 +1073,36 @@ class App(tk.Tk):
             row = sel[0] if sel else ""
         if not row:
             return
-        tags = tree.item(row, "tags") or ()
-        vals = tree.item(row, "values")
-        path = vals[0] if vals else ""
-        # 目录：切换展开，直接看到里面的笔记
-        if "dir" in tags or (path and os.path.isdir(path)):
+        path = self._tree_row_path(tree, row)
+        # 目录：双击只展开（不收起），空目录打开系统文件夹；绝不走「打开选中」
+        if self._is_dir_row(tree, row):
             if tree.get_children(row):
-                tree.item(row, open=not bool(tree.item(row, "open")))
+                if not tree.item(row, "open"):
+                    tree.item(row, open=True)
             elif path and os.path.isdir(path):
-                # 叶子目录（无 md）才退回系统打开
                 self._reveal_folder(path)
             return
         # 笔记文件：Obsidian 打开
         if path and os.path.isfile(path) and path.lower().endswith(".md"):
             self._obsidian_open(path)
-        elif path:
-            self._open_selected_entry()
 
     def _open_selected_entry(self):
+        tree = getattr(self, "course_tree", None)
+        row = ""
+        if tree is not None:
+            sel = tree.selection()
+            row = sel[0] if sel else ""
         path = self._selected_tree_path()
-        if not path:
+        if not path and not row:
             messagebox.showinfo("提示", "请先选中一个笔记或笔记夹")
             return
-        if os.path.isdir(path):
+        if path and os.path.isdir(path):
             self._reveal_folder(path)
-        elif os.path.isfile(path) and path.lower().endswith(".md"):
+        elif path and os.path.isfile(path) and path.lower().endswith(".md"):
             self._obsidian_open(path)
+        elif row and self._is_dir_row(tree, row):
+            # 已选中目录但路径解析失败时不误报「未选中」
+            messagebox.showinfo("提示", "无法定位该笔记夹路径，请刷新后再试")
         else:
             messagebox.showinfo("提示", "请选中一个笔记(.md)或笔记夹再打开")
 
@@ -1249,6 +1364,10 @@ class App(tk.Tk):
         dz.pack(fill="x", pady=(0, 4))
         self.drop_zone = dz
         self._setup_dnd(dz)
+        if not self._dnd_ready:
+            # 缺少 tkinterdnd2 时降级为点击选择
+            dz.icon_id.config(text="点击选择课件")
+            dz.sub_id.config(text="支持 .pptx / .ppt / .pdf")
         self.ppt_file_label = tk.Label(parent, text="尚未选择课件", bg=SURFACE, fg=TEXT_LIGHT,
                                        font=FONT_XS, anchor="w", wraplength=680, justify="left")
         self.ppt_file_label.pack(fill="x", pady=(2, 0))
@@ -1297,26 +1416,191 @@ class App(tk.Tk):
             pass
         return []
 
-    def _setup_dnd(self, widget):
+    # ───────────────────────── 拖拽上传 (tkdnd) ─────────────────────────
+    def _enable_dnd(self):
+        """在 Tk root 上加载 tkdnd 扩展，使其全部子控件具备拖放能力。"""
+        if not HAS_DND or _TkinterDnD is None:
+            return False
+        fn = getattr(_TkinterDnD, "require", None) or getattr(_TkinterDnD, "_require", None)
+        if fn is not None:
+            try:
+                fn(self)
+                return True
+            except Exception:
+                pass
+        # 某些环境(精简 shell / 沙箱)缺少 PROCESSOR_ARCHITECTURE，tkinterdnd2
+        # 会据此判定平台而失败；补上该变量后重试，仍失败则自己按目录探测。
+        self._patch_arch_env()
+        if fn is not None:
+            try:
+                fn(self)
+                return True
+            except Exception as e:
+                print("tkdnd 加载失败，拖拽上传不可用:", e)
+        return self._load_tkdnd_by_dir()
+
+    @staticmethod
+    def _patch_arch_env():
+        """Windows 下 PROCESSOR_ARCHITECTURE 缺失时补一个合理值。"""
+        if sys.platform.startswith("win") and not os.environ.get("PROCESSOR_ARCHITECTURE"):
+            os.environ["PROCESSOR_ARCHITECTURE"] = "AMD64" if sys.maxsize > 2 ** 31 else "x86"
+
+    def _load_tkdnd_by_dir(self):
+        """不依赖环境变量，直接遍历 tkinterdnd2/tkdnd/<平台>/ 尝试加载。"""
         try:
-            widget.tk.eval("""
-                proc tkDndEnter {args} { return copy }
-                proc tkDndPosition {args} { return copy }
-                proc tkDndDrop {args} { event generate %W <<Drop>> -data [lindex $args 0] }
-            """)
-            widget.bind("<<Drop>>", self._on_drop)
-            widget.tk.call("tkdnd::drop_target", "register", widget._w, "Files")
+            import tkinterdnd2 as _pkg
+        except Exception:
+            return False
+        base = os.path.dirname(os.path.abspath(_pkg.__file__))
+        tkdnd_dir = os.path.join(base, "tkdnd")
+        if not os.path.isdir(tkdnd_dir):
+            return False
+
+        if sys.platform.startswith("win"):
+            cands = (["win-x86", "win-x64", "win-arm64"] if sys.maxsize <= 2 ** 31
+                     else ["win-arm64", "win-x64", "win-x86"])
+        elif sys.platform == "darwin":
+            cands = ["osx-arm64", "osx-x64"]
+        else:
+            cands = ["linux-arm64", "linux-x64"]
+
+        try:
+            tcl_major = int(str(tk.Tcl().eval("info tclversion")).split(".")[0])
+        except Exception:
+            tcl_major = 8
+
+        names = []
+        for c in cands:
+            if tcl_major >= 9:
+                names.append(c + "-tcl9")
+            names.append(c)
+        for name in names:
+            path = os.path.join(tkdnd_dir, name)
+            if not os.path.isdir(path):
+                continue
+            try:
+                self.tk.call("lappend", "auto_path", path)
+                self.tk.call("package", "require", "tkdnd")
+                return True
+            except Exception:
+                continue
+        return False
+
+    def _setup_dnd(self, widget, recursive=True):
+        """把 widget(及其子控件) 注册为「文件拖放」目标。
+
+        Tk 的拖放目标是"指针正下方的那个控件"，而拖拽区是多层嵌套的
+        Frame/Canvas/Label，只注册外层的话指针落在文字/边框上就收不到
+        <<Drop>>，所以必须逐个注册。
+        """
+        if not getattr(self, "_dnd_ready", False):
+            return 0
+        targets = []
+
+        def _walk(w):
+            targets.append(w)
+            if recursive:
+                for ch in w.winfo_children():
+                    _walk(ch)
+
+        _walk(widget)
+        done = 0
+        for w in targets:
+            if getattr(w, "_dnd_reg", False):
+                continue
+            try:
+                w.drop_target_register(_DND_FILES)
+                w.dnd_bind("<<DropEnter>>", self._on_drag_enter)
+                w.dnd_bind("<<DropPosition>>", self._on_drag_position)
+                w.dnd_bind("<<DropLeave>>", self._on_drag_leave)
+                w.dnd_bind("<<Drop>>", self._on_drop)
+                w._dnd_reg = True
+                done += 1
+            except Exception:
+                pass
+        return done
+
+    def _is_in_drop_zone(self, widget):
+        """判断事件落在的控件是否属于文件拖拽区。"""
+        zone = getattr(self, "drop_zone", None)
+        if zone is None or widget is None:
+            return False
+        w = widget
+        while w is not None:
+            if w is zone:
+                return True
+            w = getattr(w, "master", None)
+        return False
+
+    def _reset_drop_zone(self):
+        zone = getattr(self, "drop_zone", None)
+        if zone is None:
+            return
+        try:
+            zone.set_state("active" if self._ppt_path else "normal")
         except Exception:
             pass
 
+    def _on_drag_enter(self, event):
+        """文件拖入 → 高亮拖拽区。"""
+        if self._is_in_drop_zone(getattr(event, "widget", None)):
+            try:
+                self.drop_zone.set_state("hover")
+            except Exception:
+                pass
+        return _DND_COPY
+
+    def _on_drag_position(self, event):
+        return _DND_COPY
+
+    def _on_drag_leave(self, event):
+        if self._is_in_drop_zone(getattr(event, "widget", None)):
+            self._reset_drop_zone()
+        return None
+
+    def _parse_drop_paths(self, data):
+        """把 tkdnd 的 %D 数据拆成路径列表（含空格路径被 {} 包裹）。"""
+        try:
+            items = list(self.tk.splitlist(data))
+        except Exception:
+            items = str(data).split()
+        paths = []
+        for it in items:
+            s = str(it).strip()
+            if len(s) >= 2 and s[0] == "{" and s[-1] == "}":
+                s = s[1:-1]
+            if s:
+                paths.append(s)
+        return paths
+
     def _on_drop(self, event):
-        data = getattr(event, "data", "")
+        """处理拖入的文件：取第一个受支持的课件。"""
+        self._reset_drop_zone()
+        data = getattr(event, "data", "") or ""
         if not data:
-            return
-        files = [f.strip("{}\"") for f in data.split()
-                 if _doc_supported(f.strip("{}\""))]
-        if files:
-            self._set_ppt(files[0])
+            return _DND_NONE
+        paths = self._parse_drop_paths(data)
+        files = [p for p in paths if os.path.isfile(p)]
+        dirs = [p for p in paths if os.path.isdir(p)]
+        ok = [p for p in files if _doc_supported(p)]
+
+        if not ok:
+            if dirs and not files:
+                messagebox.showwarning("无法添加",
+                                       "检测到拖入的是文件夹，请拖入 .pptx / .ppt / .pdf 课件文件。")
+            elif files:
+                names = "、".join(os.path.basename(p) for p in files[:3])
+                more = " 等" if len(files) > 3 else ""
+                messagebox.showwarning("格式不支持",
+                                       f"只支持 .pptx / .ppt / .pdf 课件。\n\n收到：{names}{more}")
+            return _DND_NONE
+
+        self._set_ppt(ok[0])
+        if len(ok) > 1:
+            self.set_status(f"已选课件：{os.path.basename(ok[0])}")
+            self.log(f"一次只能处理一个课件，已取第一个「{os.path.basename(ok[0])}」，"
+                     f"其余 {len(ok) - 1} 个已忽略", "dim")
+        return _DND_COPY
 
     # ───────────────────────── 专业 / 输出 / 模型 ─────────────────────────
     def _build_setup_section(self, parent):
@@ -1395,6 +1679,25 @@ class App(tk.Tk):
         self._mode_to_display = {v: k for k, v in self._mode_values.items()}
         self.mode_dd.pack(side="left", fill="x", expand=True)
         self.mode_dd.bind("<<ComboboxSelected>>", self._on_mode_change)
+
+        # 关系图配色(生成后自动写进 Vault 根的 .obsidian/graph.json)
+        tk.Label(parent, text="图谱配色", font=FONT_S, bg=SURFACE, fg=TEXT_MED).grid(
+            row=8, column=0, sticky="w", padx=(0, 12), pady=(0, 2))
+        gs_row = tk.Frame(parent, bg=SURFACE)
+        gs_row.grid(row=8, column=1, columnspan=2, sticky="ew", pady=(0, 2))
+        self.graph_scheme_var = tk.StringVar(value="course")
+        self.graph_scheme_dd = ttk.Combobox(gs_row, textvariable=self.graph_scheme_var,
+                                            state="readonly", font=FONT_S)
+        self.graph_scheme_dd.configure(values=["每课一色 · 同课聚成一团（推荐）", "按层级 · 结构色"])
+        self.graph_scheme_var.set("每课一色 · 同课聚成一团（推荐）")
+        self._gs_values = {"每课一色 · 同课聚成一团（推荐）": "course",
+                           "按层级 · 结构色": "layer"}
+        self._gs_to_display = {v: k for k, v in self._gs_values.items()}
+        self.graph_scheme_dd.pack(side="left", fill="x", expand=True)
+        self.graph_scheme_dd.bind("<<ComboboxSelected>>", self._on_graph_scheme_change)
+        tk.Label(parent, text="打开 Obsidian 左侧「关系图」查看；同一门课自动聚成一团",
+                 bg=SURFACE, fg=TEXT_LIGHT, font=FONT_XS, anchor="w").grid(
+            row=9, column=1, columnspan=2, sticky="ew", pady=(0, 6))
 
     def _pick_prof(self, pid):
         self._prof_id = pid
@@ -1486,6 +1789,10 @@ class App(tk.Tk):
                 _nm = self.account.get_pref("notes_mode", "lecture") or "lecture"
                 if hasattr(self, "mode_var") and hasattr(self, "_mode_to_display"):
                     self.mode_var.set(self._mode_display_of(_nm))
+                _gs = self.account.get_pref("graph_scheme", "course") or "course"
+                if hasattr(self, "graph_scheme_var") and hasattr(self, "_gs_to_display"):
+                    self.graph_scheme_var.set(
+                        self._gs_to_display.get(_gs, "每课一色 · 同课聚成一团（推荐）"))
             except Exception:
                 pass
         except Exception:
@@ -1735,9 +2042,11 @@ class App(tk.Tk):
                 return
         pid = self._prof_id or (self.profs[0].id if self.profs else "")
         mode = self._mode_values.get(self.mode_var.get(), "lecture")
+        graph_scheme = self._graph_scheme_value()
         try:
             if self.account is not None:
                 self.account.set_pref("notes_mode", mode)
+                self.account.set_pref("graph_scheme", graph_scheme)
         except Exception:
             pass
         self._running = True
@@ -1749,8 +2058,25 @@ class App(tk.Tk):
         set_btn_enabled(self.open_btn, False)
         self.progress["value"] = 0
         t = threading.Thread(target=self._run_worker,
-                             args=(self._ppt_path, pid, self._vault_dir, mode), daemon=True)
+                             args=(self._ppt_path, pid, self._vault_dir, mode,
+                                   self._resolve_vault_root()), daemon=True)
         t.start()
+
+    def _resolve_vault_root(self):
+        """本次输出目录所属的 Obsidian 仓库根(用于把 graph.json 写到正确位置、算准双链路径)。
+
+        选了课程时 = 知识库根; 未选课程时 = 输出目录自身。
+        """
+        vd = getattr(self, "_vault_dir", "") or ""
+        vr = getattr(self, "_vault_root", "") or ""
+        try:
+            if vd and vr:
+                a, b = os.path.abspath(vd), os.path.abspath(vr)
+                if a == b or a.startswith(b + os.sep):
+                    return b
+        except Exception:
+            pass
+        return vd
 
     def _mode_display_of(self, mode):
         if mode in self._mode_to_display:
@@ -1765,7 +2091,20 @@ class App(tk.Tk):
             except Exception:
                 pass
 
-    def _run_worker(self, ppt, pid, vault, mode="lecture"):
+    def _graph_scheme_value(self):
+        try:
+            return self._gs_values.get(self.graph_scheme_var.get(), "course")
+        except Exception:
+            return "course"
+
+    def _on_graph_scheme_change(self, _evt=None):
+        if self.account is not None:
+            try:
+                self.account.set_pref("graph_scheme", self._graph_scheme_value())
+            except Exception:
+                pass
+
+    def _run_worker(self, ppt, pid, vault, mode="lecture", vault_root=None, graph_scheme=None):
         stages = [("准备", 5), ("解析文档", 25), ("调用模型/总结", 55), ("生成笔记", 85), ("写入文件", 95)]
         stage_i = [0]
 
@@ -1790,7 +2129,7 @@ class App(tk.Tk):
                     llm = None
             result = run_conversion(ppt, pid, vault, account=self.account,
                                     model_index=model_idx, llm=llm, progress=progress,
-                                    mode=mode)
+                                    mode=mode, vault_root=vault_root)
             self.after(0, lambda: self._run_done(result))
         except Exception as e:
             self.after(0, lambda: self._run_failed(str(e)))

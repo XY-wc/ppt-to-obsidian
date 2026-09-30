@@ -136,7 +136,7 @@ def test_build_files_and_screenshots():
     written = L.build_lecture_files(b, out_dir, pdf)
     md_files = [w for w in written if w.endswith(".md")]
     png_files = [w for w in written if w.endswith(".png")]
-    assert any("index.md" in w for w in md_files)
+    assert any("物理化学.md" in w for w in md_files)   # 目录页与课件夹同名
     assert any("1.1-概论.md" in w for w in md_files)
     assert len(png_files) == 1  # p1 截图成功
     # 正文里占位被替换成图片引用

@@ -11,7 +11,8 @@
     - 正文可内联 [[相关小节]] 链接(落盘时映射为真实文件名, 形成知识关联)
 
 对外: summarize_lecture(doc, prof, llm, progress, extra_context) -> LectureBundle
-      build_lecture_files(bundle, course_dir, source_path) -> 写入 index+各节+attachments
+      build_lecture_files(bundle, course_dir, source_path, vault_root=...) -> 写入各节+目录+截图
+      build_course_index(course_dir, vault_root=...) -> 刷新「课程总目录」, 串联同课各课件
 """
 import os
 import re
@@ -21,6 +22,7 @@ from typing import List, Dict, Optional, Callable
 from core.knowledge_base import Profession
 from core.ppt_parser import PresentationDoc
 from obsidian import staged
+from obsidian import graph_config as gcfg
 from obsidian.staged import (_fill, _chat_json, _range_to_indices, _slice_by_indices,
                              _per_slide_preview, RETRY_PER_CALL, OUT_TOKENS_CAP)
 
@@ -494,10 +496,137 @@ def _render_shot(source_path: str, page_no: int, out_png: str, tmp_dir: Optional
     return False
 
 
+# ================= 课程总目录(关系图按课程聚簇) =================
+
+COURSE_HUB_SUFFIX = " 课程总目录"
+HUB_TAGS = ["课程总目录", "层级/课程"]
+LEGACY_INDEX = "index.md"       # 旧版讲义目录页文件名(仅作读取兼容)
+INDEX_FALLBACK_SUFFIX = "-目录"  # 目录页与某节笔记同名时的退让后缀
+# 关系图说明(写进课程总目录, 打开图谱时一眼知道颜色含义)
+GRAPH_HINT = ("> [!tip]- 🕸️ 怎么看关系图\n"
+              "> 打开 Obsidian 左侧「关系图」：同一门课的笔记会聚成一团；"
+              "颜色用来区分课程与层级（紫＝课程枢纽、金橙＝课件目录、蓝＝正文、绿＝概念、灰蓝＝附录）。")
+
+
+def course_hub_name(course_dir: str) -> str:
+    """课程总目录的文件名主干: '<课程名> 课程总目录'。"""
+    name = os.path.basename(os.path.normpath(os.path.abspath(course_dir))) or "课程"
+    return f"{name}{COURSE_HUB_SUFFIX}"
+
+
+def _read_fm_field(md_path: str, key: str = "title") -> str:
+    """从 frontmatter 里取一个字段值(去掉包裹引号)。"""
+    try:
+        with open(md_path, "r", encoding="utf-8") as f:
+            head = f.read(2000)
+    except Exception:
+        return ""
+    m = re.search(rf'^{re.escape(key)}:\s*(.+?)\s*$', head, re.M)
+    if not m:
+        return ""
+    return m.group(1).strip().strip('"').strip("'")
+
+
+def ppt_index_name(folder: str) -> str:
+    """课件目录页文件名: 与课件夹同名(folder-note)。
+
+    好处: 关系图/文件列表里节点显示的是课件标题, 而不是一堆「index」。
+    """
+    return f"{folder}.md"
+
+
+def find_ppt_index(ppt_dir: str) -> Optional[str]:
+    """在课件子夹里找它的目录页: {夹名}.md -> {夹名}-目录.md -> index.md -> 00_MOC.md。"""
+    name = os.path.basename(os.path.normpath(ppt_dir))
+    cands = [f"{name}.md", f"{name}{INDEX_FALLBACK_SUFFIX}.md", LEGACY_INDEX, "00_MOC.md"]
+    for cand in cands:
+        p = os.path.join(ppt_dir, cand)
+        if os.path.isfile(p):
+            return p
+    return None
+
+
+def build_course_index(course_dir: str, progress: Optional[Callable[[str], None]] = None,
+                       vault_root: Optional[str] = None) -> Optional[str]:
+    """扫描 course_dir 下各课件子夹, 生成/刷新「课程总目录」, 串联同课所有课件。
+
+    关系图聚簇靠双链而非文件夹: 同一门课的各课件 index 原本互不相连(各自成孤岛),
+    经总目录一连, 整门课成为一个连通分量 -> 关系图里自动聚成一团。
+    返回总目录文件路径; 该课程下还没有课件时删除旧总目录并返回 None。
+    """
+    if not course_dir or not os.path.isdir(course_dir):
+        return None
+    hub_path = os.path.join(course_dir, course_hub_name(course_dir) + ".md")
+
+    root = vault_root or gcfg.find_vault_root(course_dir)
+    prefix = gcfg.rel_prefix(course_dir, root)
+    course_name = os.path.basename(os.path.normpath(os.path.abspath(course_dir))) or "课程"
+
+    entries = []
+    try:
+        subs = sorted(os.listdir(course_dir))
+    except Exception:
+        subs = []
+    for sub in subs:
+        if sub.startswith(".") or sub.lower() == "attachments":
+            continue
+        pdir = os.path.join(course_dir, sub)
+        if not os.path.isdir(pdir):
+            continue
+        idx = find_ppt_index(pdir)
+        if not idx:
+            continue
+        stem = os.path.splitext(os.path.basename(idx))[0]
+        try:
+            n_sec = sum(1 for f in os.listdir(pdir)
+                        if f.lower().endswith(".md") and f != os.path.basename(idx))
+        except Exception:
+            n_sec = 0
+        entries.append({
+            "title": _read_fm_field(idx) or sub,
+            "link": "/".join(x for x in (prefix, sub, stem) if x),
+            "sec": n_sec,
+            "src": _read_fm_field(idx, "source"),
+        })
+
+    if not entries:
+        if os.path.isfile(hub_path):
+            try:
+                os.remove(hub_path)
+            except Exception:
+                pass
+        return None
+
+    def _esc(s) -> str:
+        # markdown 表格里 | 需转义, 否则双链会被截断
+        return str(s or "").replace("|", "\\|")
+
+    L = ["---", f'title: "{course_name}{COURSE_HUB_SUFFIX}"', "type: course-index", "tags:"]
+    ctag = gcfg.course_tag(course_name)
+    L += [f"  - {t}" for t in (HUB_TAGS + [ctag])]
+    L += ["---", "", f"# 📚 {course_name}{COURSE_HUB_SUFFIX}", "",
+          f"> 本页串联《{course_name}》下全部课件笔记; 有了它, 关系图里这门课会自然聚成一团。",
+          "", GRAPH_HINT, "", f"## 课件（{len(entries)}）", "",
+          "| 课件 | 小节 | 来源课件 |", "|------|------|----------|"]
+    for e in entries:
+        L.append(f"| [[{e['link']}\\|{_esc(e['title'])}]] | {e['sec']} | {_esc(e['src'])} |")
+    L += ["", "---", "*由「PPT → Obsidian 智能笔记」自动生成; 每转换一份课件后自动刷新。*"]
+    with open(hub_path, "w", encoding="utf-8") as f:
+        f.write("\n".join(L) + "\n")
+    if progress:
+        progress(f"🧩 课程总目录已刷新({len(entries)} 份课件) -> {os.path.basename(hub_path)}")
+    return hub_path
+
+
 def build_lecture_files(bundle: LectureBundle, course_dir: str, source_path: str,
-                        progress: Optional[Callable[[str], None]] = None) -> List[str]:
-    """把讲义 bundle 落盘到 course_dir/课夹名/ 下: index.md + {stem}.md + attachments/截图。
-    返回写出的文件路径清单。重复转换同课件时整夹刷新(覆盖式)。"""
+                        progress: Optional[Callable[[str], None]] = None,
+                        vault_root: Optional[str] = None) -> List[str]:
+    """把讲义 bundle 落盘到 course_dir/<课件夹>/ 下: 目录页 + {stem}.md + attachments/截图。
+    返回写出的文件路径清单。重复转换同课件时整夹刷新(覆盖式)。
+
+    内部双链一律写成**仓库相对路径**(如 [[物理化学/热力学第一定律/1.1-概论|1.1 概论]]),
+    以免不同课程的同名小节(多门课都有 '1.1 绪论')互相串链、把关系图搅成一团。
+    """
     folder = _slug(bundle.title) or "notes"
     if folder in (".", ".."):
         folder = "notes"
@@ -509,10 +638,35 @@ def build_lecture_files(bundle: LectureBundle, course_dir: str, source_path: str
     att_dir = os.path.join(out_dir, "attachments")
     os.makedirs(att_dir, exist_ok=True)
     written = []
+
+    # 仓库相对前缀(课程夹在仓库中的位置, 通常即课程名) + 本课件链接基址
+    root = vault_root or gcfg.find_vault_root(course_dir)
+    prefix = gcfg.rel_prefix(course_dir, root)
+    link_base = "/".join(x for x in (prefix, folder) if x)
+    course_name = os.path.basename(os.path.normpath(os.path.abspath(course_dir))) or "课程"
+    ctag = gcfg.course_tag(course_name)   # 课程标签: 关系图靠它把同课笔记聚成一团
+    hub_link = "/".join(x for x in (prefix, course_hub_name(course_dir)) if x)
+
     src_stem = _slug(os.path.splitext(bundle.source_file)[0])
     sections = list(bundle.sections)
     for s in sections:
         s.body = _normalize_shots(s.body)
+
+    # stem -> 可读显示名(用于双链别名)
+    disp = {s.stem: (f"{s.num} {s.title}" if s.num else s.title) for s in sections}
+
+    def qualify(md: str) -> str:
+        """把正文里的 [[小节]] 补成带仓库路径的双链, 保留可读别名。"""
+        if not md:
+            return md
+
+        def _rep(m):
+            t = m.group(1).strip()
+            if t in disp:
+                return f"[[{link_base}/{t}|{disp[t]}]]"
+            return m.group(0)
+
+        return re.sub(r"\[\[([^\]\|]+)\]\]", _rep, md)
 
     # ---- 1. 渲染截图(去重页)并把占位替换成图片引用 ----
     shot_map = {}
@@ -543,35 +697,42 @@ def build_lecture_files(bundle: LectureBundle, course_dir: str, source_path: str
         nxt_ = sections[i + 1] if i < len(sections) - 1 else None
         parts = []
         if prev_:
-            parts.append(f"← 上一节：[[{prev_.stem}|{prev_.num} {prev_.title}]]")
+            parts.append(f"← 上一节：[[{link_base}/{prev_.stem}|{disp.get(prev_.stem, prev_.stem)}]]")
         if nxt_:
-            parts.append(f"→ 下一节：[[{nxt_.stem}|{nxt_.num} {nxt_.title}]]")
+            parts.append(f"→ 下一节：[[{link_base}/{nxt_.stem}|{disp.get(nxt_.stem, nxt_.stem)}]]")
         nav = ("\n\n---\n\n" + "　".join(parts)) if parts else ""
         title_line = f"{s.num} {s.title}" if s.num else s.title
-        head = _frontmatter(title_line, bundle.source_file, ["层级/正文"])
+        head = _frontmatter(title_line, bundle.source_file, ["层级/正文", ctag])
         fp = os.path.join(out_dir, f"{s.stem}.md")
         with open(fp, "w", encoding="utf-8") as f:
-            f.write(head + s.body.rstrip() + "\n" + nav + "\n")
+            f.write(head + qualify(s.body).rstrip() + "\n" + nav + "\n")
         written.append(fp)
 
-    # ---- 3. index ----
+    # ---- 3. 目录页(与课件夹同名, 图谱节点即课件标题) ----
     # frontmatter 里的 层级/* tag 供 Obsidian 关系图按层级上色(见 obsidian/graph_config.py)
     idx = ["---", f'title: "{bundle.title}"', "type: knowledge",
-           f'source: "{bundle.source_file}"', "tags:", "  - 课程", "  - 层级/目录", "---", "",
+           f'source: "{bundle.source_file}"', "tags:", "  - 课程", "  - 层级/目录",
+           f"  - {ctag}", "---", "",
            f"# 📗 {bundle.title}", "",
-           f"> 由《{bundle.source_file}》自动整理 · 本页为章目录，点击跳转各节笔记", "", "## 目录", ""]
+           f"> 由《{bundle.source_file}》自动整理 · 本页为章目录，点击跳转各节笔记",
+           f"> 🔗 返回 [[{hub_link}|《{course_name}》课程总目录]]", "", "## 目录", ""]
     for s in sections:
-        idx.append(f"- **{s.num}** {s.title} — [[{s.stem}]]")
+        idx.append(f"- **{s.num}** {s.title} — [[{link_base}/{s.stem}|{s.title}]]")
     idx += ["", "---", "*每节含表格/公式/要点与课件截图；节末可跳上一节/下一节。*"]
     if shots_ok:
         idx.append(f"\n*含 {shots_ok} 张课件原页截图，见各节内嵌图片。*")
-    ip = os.path.join(out_dir, "index.md")
+    # 目录页与课件夹同名(folder-note); 万一与某节笔记撞名则退让加后缀
+    index_name = ppt_index_name(folder)
+    if index_name in {f"{s.stem}.md" for s in sections}:
+        index_name = f"{folder}{INDEX_FALLBACK_SUFFIX}.md"
+    ip = os.path.join(out_dir, index_name)
     with open(ip, "w", encoding="utf-8") as f:
         f.write("\n".join(idx) + "\n")
     written.append(ip)
 
     if progress:
-        progress(f"✅ 讲义落盘完成: {len(sections)} 节 + index, 截图 {shots_ok} 张 -> {out_dir}")
+        progress(f"✅ 讲义落盘完成: {len(sections)} 节 + {index_name}, "
+                 f"截图 {shots_ok} 张 -> {out_dir}")
     return written
 
 
